@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787206079316,
+      "tag": "0000_overrated_ink",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787229967873,
+      "tag": "0001_omniscient_microbe",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787236697486,
+      "tag": "0002_slim_the_hood",
+      "breakpoints": true
+    }
+  ]
+}

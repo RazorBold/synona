@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Design token Synona — diturunkan dari mockup dashboard.
+   Lihat PRD-TEKNIS.md §12.
+------------------------------------------------------------------- */
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  /* Merek */
+  --color-brand-50: #f1efff;
+  --color-brand-100: #e6e2ff;
+  --color-brand-200: #d3ccff;
+  --color-brand-300: #b3a7fb;
+  --color-brand-400: #8b7cf8;
+  --color-brand-500: #6d5df6;
+  --color-brand-600: #5b4be0;
+  --color-brand-700: #4a3cc0;
+
+  /* Netral */
+  --color-ink: #1e2235;
+  --color-ink-soft: #4a5069;
+  --color-muted: #8a90a6;
+  --color-line: #edeff5;
+  --color-canvas: #f7f8fc;
+
+  /* Semantik */
+  --color-success: #22c55e;
+  --color-info: #3b82f6;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --radius-card: 1rem;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04),
+    0 8px 24px -12px rgba(16, 24, 40, 0.1);
+  --shadow-pop: 0 8px 24px -8px rgba(109, 93, 246, 0.45);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Angka uang selalu rata lebar agar kolom nominal tidak "goyang". */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .card {
+    background: #fff;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-title {
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+  }
+
+  .link-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-brand-500);
+  }
+  .link-more:hover {
+    color: var(--color-brand-600);
+  }
+}
+
+/* Scrollbar tipis di sidebar & daftar panjang */
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #e2e5ee;
+  border-radius: 999px;
+}
