@@ -162,6 +162,14 @@ npm run data:kosongkan -- "Warung Bu Ani" "Bu Ani" --ya   # jalankan
 
 Perintah ini membuat backup otomatis ke `data/backup/` lebih dulu, lalu mengosongkan seluruh tabel usaha dan menyiapkan satu outlet kosong. **Akun login di tabel `pengguna` tidak disentuh** — mengosongkan data usaha tidak boleh sekaligus mengunci pemiliknya keluar.
 
+## Produk tanpa lacak stok
+
+Setiap produk punya tanda **"Jangan lacak stok produk ini"** di form produk. Untuk F&B masak-saat-pesan (nasi goreng, kopi susu) atau jasa, tidak ada "stok" yang masuk akal — tanpa opsi ini penjual harus mengisi stok palsu yang besar, atau POS menolak penjualan dengan "Stok tinggal 0" di tengah jam ramai.
+
+Produk yang tidak dilacak: tidak pernah dianggap habis di kasir, tidak mengurangi stok, tidak menulis ke `stock_movements`, dan tidak ikut filter "menipis"/"habis". Di kasir labelnya "Selalu ada", di daftar produk "Tidak dilacak".
+
+Produk lama tetap dilacak (`lacak_stok` default `1`), jadi migrasinya tidak mengubah perilaku apa pun.
+
 ## PWA
 
 Manifest, ikon (termasuk varian maskable), dan service worker sudah terpasang.

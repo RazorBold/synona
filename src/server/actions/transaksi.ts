@@ -89,7 +89,9 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
       for (const item of data.items) {
         const p = byId.get(item.productId);
         if (!p) throw new Error("Ada produk yang tidak ditemukan di outlet ini");
-        if (p.stock < item.qty) {
+        // Produk tanpa lacak stok (mis. masak-saat-pesan) tidak pernah
+        // kehabisan — penjualannya tidak boleh diblokir angka stok.
+        if (p.lacakStok === 1 && p.stock < item.qty) {
           throw new Error(`Stok ${p.name} tinggal ${p.stock} ${p.unit}`);
         }
 
@@ -159,9 +161,12 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
         .values(barisItem.map((b) => ({ ...b, transactionId: txId })))
         .run();
 
-      // Stok berkurang + jejak di buku besar stok.
+      // Stok berkurang + jejak di buku besar stok. Produk yang tidak dilacak
+      // dilewati sepenuhnya: tidak ada angka stok yang bermakna untuk dikurangi,
+      // dan buku besarnya akan penuh baris yang menyesatkan.
       for (const item of data.items) {
         const p = byId.get(item.productId)!;
+        if (p.lacakStok !== 1) continue;
         const stokBaru = p.stock - item.qty;
 
         tx.update(products)

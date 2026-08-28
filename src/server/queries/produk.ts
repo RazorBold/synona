@@ -17,6 +17,7 @@ export type BarisProduk = {
   modal: number;
   stok: number;
   batasStok: number;
+  lacakStok: number;
   unit: string;
 };
 
@@ -35,6 +36,7 @@ export async function getDaftarProduk(outletId: string): Promise<BarisProduk[]> 
       modal: products.cost,
       stok: products.stock,
       batasStok: products.lowStockThreshold,
+      lacakStok: products.lacakStok,
       unit: products.unit,
     })
     .from(products)

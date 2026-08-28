@@ -11,8 +11,14 @@ export type ItemKeranjang = {
   harga: number;
   qty: number;
   stok: number;
+  /** 0 = tidak dilacak stoknya, jadi tidak ada batas qty. */
+  lacakStok: number;
   unit: string;
 };
+
+/** Batas qty untuk satu item; produk tanpa lacak stok tidak dibatasi. */
+export const batasQty = (i: { stok: number; lacakStok: number }) =>
+  i.lacakStok === 1 ? i.stok : Number.MAX_SAFE_INTEGER;
 
 type CartState = {
   items: ItemKeranjang[];
@@ -39,7 +45,7 @@ export const useCart = create<CartState>()(
           const ada = s.items.find((i) => i.id === p.id);
           if (!ada) return { items: [...s.items, { ...p, qty: 1 }] };
           // Jangan pernah melebihi stok yang tersedia.
-          if (ada.qty >= p.stok) return s;
+          if (ada.qty >= batasQty(p)) return s;
           return {
             items: s.items.map((i) =>
               i.id === p.id ? { ...i, qty: i.qty + 1 } : i,
@@ -51,7 +57,7 @@ export const useCart = create<CartState>()(
         set((s) => ({
           items: s.items.flatMap((i) => {
             if (i.id !== id) return [i];
-            const next = Math.min(Math.max(0, qty), i.stok);
+            const next = Math.min(Math.max(0, qty), batasQty(i));
             return next === 0 ? [] : [{ ...i, qty: next }];
           }),
         })),

@@ -122,6 +122,15 @@ export const products = sqliteTable(
     price: integer("price").notNull(), // harga jual (Rp)
     cost: integer("cost").notNull().default(0), // modal / HPP (Rp)
     stock: integer("stock").notNull().default(0),
+    /**
+     * 0 = produk ini tidak dilacak stoknya.
+     *
+     * Untuk F&B masak-saat-pesan (nasi goreng, kopi susu) tidak ada
+     * "stok nasi goreng" yang masuk akal. Tanpa opsi ini penjual harus
+     * mengisi stok palsu yang besar, atau POS menolak penjualan dengan
+     * "Stok tinggal 0" di tengah jam ramai.
+     */
+    lacakStok: integer("lacak_stok").notNull().default(1),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     unit: text("unit").notNull().default("pcs"),
     // Nama berkas foto di data/uploads/produk, bukan URL penuh — supaya

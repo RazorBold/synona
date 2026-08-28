@@ -61,6 +61,7 @@ const ProdukInput = z.object({
   harga: z.coerce.number().int().min(0, "Harga tidak boleh negatif"),
   modal: z.coerce.number().int().min(0, "Modal tidak boleh negatif"),
   stokAwal: z.coerce.number().int().min(0).default(0),
+  lacakStok: z.coerce.number().int().min(0).max(1).default(1),
   batasStok: z.coerce.number().int().min(0).default(5),
   unit: z.string().trim().min(1).max(12).default("pcs"),
 });
@@ -87,6 +88,7 @@ export async function simpanProduk(formData: FormData): Promise<HasilAksi> {
     harga: formData.get("harga") ?? 0,
     modal: formData.get("modal") ?? 0,
     stokAwal: formData.get("stokAwal") ?? 0,
+    lacakStok: formData.get("lacakStok") ?? 1,
     batasStok: formData.get("batasStok") ?? 5,
     unit: ambil("unit") ?? "pcs",
   });
@@ -148,6 +150,7 @@ export async function simpanProduk(formData: FormData): Promise<HasilAksi> {
             price: d.harga,
             cost: d.modal,
             lowStockThreshold: d.batasStok,
+            lacakStok: d.lacakStok,
             unit: d.unit,
             imageUrl: gambarFinal,
           })
@@ -167,14 +170,15 @@ export async function simpanProduk(formData: FormData): Promise<HasilAksi> {
           sku: d.sku,
           price: d.harga,
           cost: d.modal,
-          stock: d.stokAwal,
+          stock: d.lacakStok === 1 ? d.stokAwal : 0,
           lowStockThreshold: d.batasStok,
+          lacakStok: d.lacakStok,
           unit: d.unit,
           imageUrl: gambarFinal,
         })
         .run();
 
-      if (d.stokAwal > 0) {
+      if (d.lacakStok === 1 && d.stokAwal > 0) {
         tx.insert(stockMovements)
           .values({
             id: nanoid(),

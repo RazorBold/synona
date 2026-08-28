@@ -36,6 +36,7 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
   const [modal, setModal] = useState(0);
   const [unit, setUnit] = useState("pcs");
   const [batasStok, setBatasStok] = useState(5);
+  const [lacakStok, setLacakStok] = useState(true);
   const [stokAwal, setStokAwal] = useState(0);
 
   const [fotoLama, setFotoLama] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
     setModal(produk?.modal ?? 0);
     setUnit(produk?.unit ?? "pcs");
     setBatasStok(produk?.batasStok ?? 5);
+    setLacakStok((produk?.lacakStok ?? 1) === 1);
     setStokAwal(0);
     setFotoLama(produk?.gambar ?? null);
     setFotoBaru(null);
@@ -117,6 +119,7 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
     fd.set("modal", String(modal));
     fd.set("stokAwal", String(stokAwal));
     fd.set("batasStok", String(batasStok));
+    fd.set("lacakStok", lacakStok ? "1" : "0");
     fd.set("unit", unit);
     if (fotoBaru) fd.set("gambar", fotoBaru);
     if (hapusFoto && !fotoBaru) fd.set("hapusGambar", "1");
@@ -327,17 +330,19 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
                   className={inputKelas}
                 />
               </div>
-              <div>
-                <Label>Batas menipis</Label>
-                <input
-                  type="number"
-                  min={0}
-                  value={batasStok}
-                  onChange={(e) => setBatasStok(Number(e.target.value))}
-                  className={cn(inputKelas, "tabular text-right")}
-                />
-              </div>
-              {!edit && (
+              {lacakStok && (
+                <div>
+                  <Label>Batas menipis</Label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={batasStok}
+                    onChange={(e) => setBatasStok(Number(e.target.value))}
+                    className={cn(inputKelas, "tabular text-right")}
+                  />
+                </div>
+              )}
+              {!edit && lacakStok && (
                 <div>
                   <Label>Stok awal</Label>
                   <input
@@ -350,6 +355,25 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
                 </div>
               )}
             </div>
+
+            {/* Untuk menu masak-saat-pesan: tidak ada angka stok yang masuk akal. */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-canvas px-4 py-3">
+              <input
+                type="checkbox"
+                checked={!lacakStok}
+                onChange={(e) => setLacakStok(!e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-brand-500"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-ink">
+                  Jangan lacak stok produk ini
+                </span>
+                <span className="block text-xs text-muted">
+                  Untuk menu yang dibuat saat dipesan (nasi goreng, kopi susu) atau
+                  jasa. Produk ini tidak akan pernah dianggap habis di kasir.
+                </span>
+              </span>
+            </label>
 
             {error && (
               <p className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-danger">
