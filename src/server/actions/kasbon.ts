@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { customers, debtPayments, debts } from "@/db/schema";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getRiwayatCicilan } from "@/server/queries/kasbon";
 
@@ -27,6 +28,7 @@ const BayarInput = z.object({
  * lain baru menerima cicilan dari orang yang sama).
  */
 export async function catatPembayaran(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = BayarInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -102,6 +104,7 @@ const UtangInput = z.object({
 
 /** Kasbon yang dicatat manual, bukan dari transaksi POS (mis. utang lama). */
 export async function tambahUtang(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = UtangInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -157,6 +160,7 @@ export async function ubahJatuhTempo(
   debtId: string,
   jatuhTempo: string | null,
 ): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   if (jatuhTempo && !/^\d{4}-\d{2}-\d{2}$/.test(jatuhTempo)) {
@@ -181,6 +185,7 @@ export async function ubahJatuhTempo(
 
 /** Riwayat cicilan satu utang (dipakai di dialog pembayaran). */
 export async function ambilRiwayatCicilan(debtId: string) {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   const milikOutlet = db.get<{ n: number }>(

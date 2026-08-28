@@ -15,6 +15,7 @@ import {
   transactions,
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 const ItemInput = z.object({
@@ -58,6 +59,7 @@ export type HasilTransaksi =
  *    dalam SATU db.transaction agar tidak ada stok berkurang tanpa penjualan.
  */
 export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
+  await wajibSesi();
   const parsed = TransaksiInput.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };

@@ -538,9 +538,42 @@ export const expenses = sqliteTable(
   ],
 );
 
+/* ------------------------------------------------------- autentikasi */
+
+/**
+ * Akun login aplikasi. Sengaja terpisah dari tabel `users` (yang menyimpan
+ * pemilik outlet beserta paket langganannya): `users` adalah data usaha,
+ * `pengguna` adalah kredensial. Memisahkannya membuat pencabutan akses tidak
+ * pernah menyentuh data outlet.
+ *
+ * Tidak ada tabel `sesi`: sesi dibawa sebagai JWT di cookie (src/lib/jwt.ts).
+ * Konsekuensinya sesi tidak bisa dicabut satu per satu — lihat README.md.
+ */
+export const pengguna = sqliteTable(
+  "pengguna",
+  {
+    id: id(),
+    nama: text("nama").notNull(),
+    namaPengguna: text("nama_pengguna").notNull(),
+    // scrypt(sandi, salt) — lihat src/server/auth.ts. Bukan bcrypt supaya
+    // tidak menambah dependency native kedua di samping better-sqlite3.
+    hashSandi: text("hash_sandi").notNull(),
+    salt: text("salt").notNull(),
+    peran: text("peran", { enum: ["pemilik", "kasir"] })
+      .notNull()
+      .default("kasir"),
+    harusGantiSandi: integer("harus_ganti_sandi").notNull().default(0),
+    dibuatPada: integer("dibuat_pada")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [uniqueIndex("idx_pengguna_nama_pengguna").on(t.namaPengguna)],
+);
+
 export type Product = typeof products.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Debt = typeof debts.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type Material = typeof materials.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type Pengguna = typeof pengguna.$inferSelect;

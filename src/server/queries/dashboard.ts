@@ -11,15 +11,23 @@ import {
   users,
 } from "@/db/schema";
 import { businessDate, rentangHari, tambahHari } from "@/lib/date";
+import { wajibSesi } from "@/server/auth";
 import { getBebanHarianEfektif } from "@/server/queries/beban";
 import { getRadar } from "@/server/queries/radar";
 
 /**
- * CATATAN: sebelum Auth.js terpasang (langkah 5), outlet diambil dari outlet
- * pertama di database. Setelah auth aktif, ganti dengan requireOutlet() yang
- * memverifikasi keanggotaan lewat tabel `staff` — lihat PRD-TEKNIS.md §6.
+ * Chokepoint data usaha: hampir semua query sensitif berangkat dari sini, jadi
+ * di sinilah sesi diverifikasi sekali untuk seluruh pohon query. Melempar
+ * kalau tidak ada sesi yang sah.
+ *
+ * CATATAN: outlet masih diambil dari outlet pertama di database. Aplikasi ini
+ * baru punya satu outlet aktif; saat multi-outlet diaktifkan, ganti dengan
+ * pemilihan berdasarkan keanggotaan `staff` milik `sesi.penggunaId` — lihat
+ * PRD-TEKNIS.md §6.
  */
 export async function getOutletAktif() {
+  await wajibSesi();
+
   const row = db
     .select({
       id: outlets.id,

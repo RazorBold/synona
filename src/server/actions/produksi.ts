@@ -15,6 +15,7 @@ import {
   stockMovements,
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getKebutuhanBahan } from "@/server/queries/produksi";
 
@@ -37,6 +38,7 @@ const ProduksiInput = z.object({
  * bisa diperbaiki otomatis.
  */
 export async function catatProduksi(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = ProduksiInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -192,6 +194,7 @@ export async function catatProduksi(input: unknown): Promise<HasilAksi> {
 }
 
 export async function ambilKebutuhanBahan(productId: string) {
+  await wajibSesi();
   const outlet = await getOutletAktif();
   const milik = db.get<{ n: number }>(
     sql`SELECT COUNT(*) AS n FROM products

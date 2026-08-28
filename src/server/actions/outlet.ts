@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { outlets, staff, users } from "@/db/schema";
 import { PAKET, type Paket } from "@/lib/paket";
 import { normalisasiNomorHp } from "@/lib/wa";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -27,6 +28,7 @@ const OutletInput = z.object({
  * di UI saja tidak cukup, karena Server Action bisa dipanggil langsung.
  */
 export async function simpanOutlet(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = OutletInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -122,6 +124,7 @@ const StafInput = z.object({
  * dibuat tanpa kata sandi — nanti tinggal ditautkan ke Auth.js lewat email.
  */
 export async function simpanStaf(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = StafInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -226,6 +229,7 @@ export async function simpanStaf(input: unknown): Promise<HasilAksi> {
 
 /** Staf dinonaktifkan, bukan dihapus — transaksi lama menunjuk ke barisnya. */
 export async function nonaktifkanStaf(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const aktif = await getOutletAktif();
 
   try {
@@ -259,6 +263,7 @@ const ProfilInput = z.object({
 });
 
 export async function simpanProfilPemilik(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = ProfilInput.safeParse(input);
   if (!parsed.success) {
     return {

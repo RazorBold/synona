@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -30,6 +31,7 @@ const BebanInput = z.object({
 });
 
 export async function simpanBeban(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = BebanInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -96,6 +98,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
  * membuat "jurnal koreksi" bertentangan dengan prinsip bahasa sehari-hari.
  */
 export async function hapusBeban(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   try {

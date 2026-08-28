@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { reconciliations } from "@/db/schema";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getRingkasanKas } from "@/server/queries/rekonsiliasi";
 
@@ -27,6 +28,7 @@ const RekonInput = z.object({
  * dengan mengubah nilai di browser.
  */
 export async function simpanRekonsiliasi(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = RekonInput.safeParse(input);
   if (!parsed.success) {
     return {

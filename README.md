@@ -13,8 +13,10 @@ Stack: **Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · SQLite 3 (be
 
 ```bash
 npm install
+echo "SYNONA_JWT_SECRET=$(node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64url'))\")" > .env
 npm run db:migrate    # membuat data/synona.db + seluruh tabel
 npm run db:seed       # mengisi data demo (Bu Sari, Outlet Utama, 7 hari transaksi)
+npm run auth:init     # akun demo admin / admin
 npm run dev           # http://localhost:3000
 ```
 
@@ -31,6 +33,7 @@ npm run dev           # http://localhost:3000
 | `npm run db:seed` | Mengisi ulang data demo (menghapus isi tabel lebih dulu) |
 | `npm run db:reset` | Hapus DB → migrasi → seed |
 | `npm run db:studio` | Drizzle Studio (penjelajah data) |
+| `npm run auth:init` | Seed akun demo `admin` / `admin` (idempoten) |
 
 ## Struktur singkat
 
@@ -87,7 +90,39 @@ Sejak `synona-alur-flowchart.pdf`, alur produk dirombak: owner mencatat **4 jeni
 
 Skema database untuk seluruh alur baru sudah terpasang (8 tabel: bahan baku, buku besar bahan, resep/BOM, produksi, pembelian, hutang supplier, beban). Rancangan lengkap dan urutan pengerjaannya ada di [PRD-TEKNIS.md §16](PRD-TEKNIS.md).
 
+## Autentikasi
+
+Seluruh halaman dan **setiap** server action mewajibkan sesi yang sah. Penjaganya berlapis dan sengaja tidak bergantung pada satu titik:
+
+| Lapisan | Berkas | Yang dijamin |
+|---|---|---|
+| Middleware | `src/middleware.ts` | Menolak navigasi tanpa JWT yang tanda tangannya sah |
+| Guard action | `wajibSesi()` di `src/server/auth.ts` | Dipanggil di awal tiap server action — inilah lapisan yang benar-benar menjamin |
+| Layout | `src/app/(app)/layout.tsx` | Memastikan akun di token masih ada di database |
+
+Middleware saja **tidak cukup**: server action dipanggil lewat POST ke URL halaman mana pun dengan header `Next-Action`, jadi guard di dalam action-nya wajib.
+
+### Akun demo
+
+`npm run auth:init` membuat akun `admin` dengan sandi `admin`. **Ini kredensial demo, bukan kredensial produksi** — ganti di `/ganti-sandi` sebelum aplikasi dipakai dengan data pelanggan sungguhan. Selama sandi bawaan itu masih aktif, aplikasi menampilkan banner peringatan di setiap halaman; banner hilang sendiri setelah sandinya diganti (dideteksi dengan mencocokkan hash, bukan flag terpisah yang bisa basi).
+
+### Secret JWT
+
+Sesi dibawa sebagai JWT HS256 di cookie `httpOnly`, ditandatangani dengan `SYNONA_JWT_SECRET` dari `.env`. Kalau variabel itu tidak ada, **aplikasi sengaja menolak start** (`src/instrumentation.ts`) — tidak ada nilai default, karena secret bawaan yang diam-diam terpakai di produksi jauh lebih berbahaya daripada aplikasi yang gagal start.
+
+`.env` ada di `.gitignore`. Jangan pernah menuliskan isinya ke git, log, atau tiket.
+
+### Batasan: sesi JWT tidak bisa dicabut satu per satu
+
+Ini konsekuensi yang harus diketahui sebelum memakainya:
+
+- **Tidak ada daftar sesi di database.** Token yang sudah diterbitkan tetap sah sampai `exp`-nya lewat (30 hari), termasuk setelah pemiliknya ganti sandi.
+- **Mencabut akses = mengganti `SYNONA_JWT_SECRET`.** Itu membatalkan *semua* token sekaligus dan memaksa setiap perangkat login ulang — tidak bisa hanya satu perangkat.
+- Kalau nanti butuh pencabutan per-sesi (mis. "keluarkan HP yang hilang"), sesi harus dipindah ke tabel di database; JWT tanpa daftar sesi tidak bisa memberikannya.
+
 ## Catatan deploy
 
 **Jangan deploy ke Vercel/Netlify serverless** — filesystem-nya ephemeral sehingga file SQLite hilang. Gunakan VPS/Docker dengan volume persisten, satu replica. Detail dan jalur migrasi ke Turso/Postgres ada di [PRD-TEKNIS.md §11](PRD-TEKNIS.md).
+
+Proses Next.js **hanya listen di `127.0.0.1`** (`HOSTNAME` di `ecosystem.config.js`); akses dari luar lewat nginx. Konfigurasi proxy-nya ada di [`deploy/nginx/synona.conf`](deploy/nginx/synona.conf) beserta perintah pemasangannya. Jangan ubah pm2 ke cluster mode atau `instances > 1` — SQLite satu penulis, akan kena `SQLITE_BUSY`.
 # synona

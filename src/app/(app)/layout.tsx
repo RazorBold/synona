@@ -1,7 +1,11 @@
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
+import { redirect } from "next/navigation";
 
+import { BannerSandiDefault } from "@/components/auth/banner-sandi-default";
 import { AppShell } from "@/components/layout/app-shell";
+import { RUTE_GANTI_SANDI, RUTE_MASUK } from "@/lib/auth-const";
+import { akunSesi, sesiSaatIni } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 // Semua halaman di grup ini membaca SQLite pada tiap permintaan.
@@ -12,6 +16,15 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Penjaga kedua setelah middleware: middleware memverifikasi tanda tangan
+  // token, di sini akunnya dipastikan masih benar-benar ada di database.
+  const sesi = await sesiSaatIni();
+  if (!sesi) redirect(RUTE_MASUK);
+
+  const akun = await akunSesi(sesi);
+  if (!akun) redirect(RUTE_MASUK);
+  if (akun.harusGantiSandi) redirect(RUTE_GANTI_SANDI);
+
   const outlet = await getOutletAktif();
 
   const paket = outlet.plan.charAt(0).toUpperCase() + outlet.plan.slice(1);
@@ -21,12 +34,14 @@ export default async function AppLayout({
 
   return (
     <AppShell
-      namaPemilik={outlet.ownerName}
+      namaPemilik={akun.nama}
+      peran={akun.peran === "pemilik" ? "Pemilik" : "Kasir"}
       namaOutlet={outlet.name}
       paket={paket}
       berlakuSampai={berlakuSampai}
       jumlahNotifikasi={3}
     >
+      {akun.sandiMasihDefault && <BannerSandiDefault />}
       {children}
     </AppShell>
   );

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { products, stockMovements } from "@/db/schema";
 import { JENIS_GAMBAR, MAKS_UKURAN_BYTE } from "@/lib/gambar";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getRiwayatStok } from "@/server/queries/produk";
 
@@ -71,6 +72,7 @@ const ProdukInput = z.object({
  * sesuaikanStok() agar setiap pergerakan punya jejak di stock_movements.
  */
 export async function simpanProduk(formData: FormData): Promise<HasilAksi> {
+  await wajibSesi();
   const ambil = (k: string) => {
     const v = formData.get(k);
     return typeof v === "string" && v !== "" ? v : null;
@@ -216,6 +218,7 @@ const StokInput = z.object({
  * - opname : hasil hitung fisik, stok diset ke `jumlah`
  */
 export async function sesuaikanStok(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = StokInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -289,6 +292,7 @@ export async function sesuaikanStok(input: unknown): Promise<HasilAksi> {
  * tetap bisa menampilkan produknya. Fotonya sengaja ikut dipertahankan.
  */
 export async function arsipkanProduk(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   try {
@@ -307,6 +311,7 @@ export async function arsipkanProduk(id: string): Promise<HasilAksi> {
 
 /** Riwayat pergerakan stok satu produk (dipakai di dialog penyesuaian stok). */
 export async function ambilRiwayatStok(productId: string) {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   const milikOutlet = db

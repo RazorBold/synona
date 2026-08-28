@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "rm -rf .next/standalone/public .next/standalone/.next/static && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static && rm -f .next/standalone/.env",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "auth:init": "tsx src/db/seed-auth.ts",
     "db:studio": "drizzle-kit studio",
     "db:reset": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\" && npm run db:migrate && npm run db:seed"
   },
@@ -20,6 +22,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.44.2",
+    "jose": "^6.2.10",
     "lucide-react": "^0.542.0",
     "nanoid": "^5.1.5",
     "next": "^15.5.0",

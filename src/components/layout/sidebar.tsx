@@ -2,12 +2,12 @@
 
 import {
   ChefHat,
-  ChevronDown,
   ChevronRight,
   Clock,
   Crown,
   FileText,
   Home,
+  LogOut,
   MessageCircleQuestion,
   Package,
   PiggyBank,
@@ -24,6 +24,7 @@ import { usePathname } from "next/navigation";
 
 import { WhatsAppIcon } from "@/components/icons/whatsapp";
 import { cn } from "@/lib/utils";
+import { keluar } from "@/server/actions/auth";
 
 const NAV: { judul: string; item: { href: string; label: string; icon: typeof Home }[] }[] = [
   {
@@ -61,6 +62,7 @@ const NAV: { judul: string; item: { href: string; label: string; icon: typeof Ho
 
 type Props = {
   namaPemilik: string;
+  peran: string;
   paket: string;
   berlakuSampai: string;
   open: boolean;
@@ -69,6 +71,7 @@ type Props = {
 
 export function Sidebar({
   namaPemilik,
+  peran,
   paket,
   berlakuSampai,
   open,
@@ -213,25 +216,40 @@ export function Sidebar({
           </div>
         </nav>
 
-        {/* Profil pemilik */}
+        {/* Profil pengguna yang sedang masuk */}
         <div className="relative border-t border-line/70 px-4 py-3">
-          <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/60">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[13px] font-bold text-white">
+          <div className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left">
+            <Link
+              href="/ganti-sandi"
+              onClick={onClose}
+              aria-label="Ganti sandi"
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[13px] font-bold text-white"
+            >
               {namaPemilik
                 .split(" ")
                 .slice(0, 2)
                 .map((w) => w[0])
                 .join("")
                 .toUpperCase()}
-            </span>
+            </Link>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-bold text-ink">
                 {namaPemilik}
               </span>
-              <span className="block text-xs text-muted">Pemilik</span>
+              <span className="block text-xs text-muted">{peran}</span>
             </span>
-            <ChevronDown className="size-4 shrink-0 text-muted" />
-          </button>
+            {/* <form action={...}> supaya keluar tetap jalan tanpa JavaScript. */}
+            <form action={keluar}>
+              <button
+                type="submit"
+                aria-label="Keluar"
+                title="Keluar"
+                className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-canvas hover:text-danger"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </form>
+          </div>
         </div>
       </aside>
     </>

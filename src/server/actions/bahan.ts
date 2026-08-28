@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
 import { perbaruiHppTerkaitBahan } from "@/server/hpp";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getRiwayatBahan } from "@/server/queries/bahan";
 
@@ -32,6 +33,7 @@ const BahanInput = z.object({
 });
 
 export async function simpanBahan(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = BahanInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -116,6 +118,7 @@ const StokBahanInput = z.object({
 });
 
 export async function sesuaikanStokBahan(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = StokBahanInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -185,6 +188,7 @@ export async function sesuaikanStokBahan(input: unknown): Promise<HasilAksi> {
 }
 
 export async function arsipkanBahan(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   try {
@@ -230,6 +234,7 @@ const PembelianInput = z.object({
  * dicampur, jadi HPP tidak melonjak hanya karena satu kali beli mahal.
  */
 export async function simpanPembelian(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = PembelianInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -353,6 +358,7 @@ const BayarHutangInput = z.object({
 
 /** Pelunasan hutang ke supplier — pola sama dengan kasbon pelanggan. */
 export async function bayarHutangSupplier(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = BayarHutangInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -417,6 +423,7 @@ export async function bayarHutangSupplier(input: unknown): Promise<HasilAksi> {
 }
 
 export async function ambilRiwayatBahan(materialId: string) {
+  await wajibSesi();
   const outlet = await getOutletAktif();
   const milik = db
     .select({ id: materials.id })

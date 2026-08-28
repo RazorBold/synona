@@ -7,6 +7,7 @@ import { Topbar } from "./topbar";
 
 type Props = {
   namaPemilik: string;
+  peran: string;
   namaOutlet: string;
   paket: string;
   berlakuSampai: string;
@@ -16,6 +17,7 @@ type Props = {
 
 export function AppShell({
   namaPemilik,
+  peran,
   namaOutlet,
   paket,
   berlakuSampai,
@@ -35,6 +37,7 @@ export function AppShell({
 
       <Sidebar
         namaPemilik={namaPemilik}
+        peran={peran}
         paket={paket}
         berlakuSampai={berlakuSampai}
         open={open}
