@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { buildWaLink, pesanStruk } from "@/lib/wa";
 import { simpanTransaksi, type HasilTransaksi } from "@/server/actions/transaksi";
 import { hitungSubtotal, useCart } from "@/store/cart";
+import { aman } from "@/lib/aksi";
 
 type Metode = "cash" | "qris" | "transfer" | "debt";
 
@@ -80,7 +81,7 @@ export function PaymentDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await simpanTransaksi({
+    const hasil = await aman(simpanTransaksi({
       items: items.map((i) => ({ productId: i.id, qty: i.qty })),
       discount: Math.min(diskon, subtotal),
       paymentMethod: metode,
@@ -88,7 +89,7 @@ export function PaymentDialog({
       customerId: metode === "debt" ? customerId || null : customerId || null,
       dueDate: metode === "debt" ? jatuhTempo : null,
       note: null,
-    });
+    }));
 
     setPending(false);
 

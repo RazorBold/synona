@@ -65,6 +65,7 @@ type Props = {
   peran: string;
   paket: string;
   berlakuSampai: string;
+  waBantuan: string | null;
   open: boolean;
   onClose: () => void;
 };
@@ -74,6 +75,7 @@ export function Sidebar({
   peran,
   paket,
   berlakuSampai,
+  waBantuan,
   open,
   onClose,
 }: Props) {
@@ -191,29 +193,31 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* Kartu bantuan */}
-          <div className="mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
-                <MessageCircleQuestion className="size-[18px]" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-ink">Butuh bantuan?</p>
-                <p className="text-xs text-muted">Chat via WhatsApp</p>
+          {/* Kartu bantuan — hanya kalau nomornya sudah dikonfigurasi */}
+          {waBantuan && (
+            <div className="mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
+                  <MessageCircleQuestion className="size-[18px]" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-ink">Butuh bantuan?</p>
+                  <p className="text-xs text-muted">Chat via WhatsApp</p>
+                </div>
               </div>
+              <a
+                href={`https://wa.me/${waBantuan}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-line bg-white py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-canvas"
+              >
+                Hubungi Kami
+                <span className="grid size-6 place-items-center rounded-full bg-success text-white">
+                  <WhatsAppIcon className="size-3.5" />
+                </span>
+              </a>
             </div>
-            <a
-              href="https://wa.me/6281234567890"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-line bg-white py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-canvas"
-            >
-              Hubungi Kami
-              <span className="grid size-6 place-items-center rounded-full bg-success text-white">
-                <WhatsAppIcon className="size-3.5" />
-              </span>
-            </a>
-          </div>
+          )}
         </nav>
 
         {/* Profil pengguna yang sedang masuk */}

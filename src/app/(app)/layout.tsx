@@ -1,12 +1,14 @@
-import { format } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { redirect } from "next/navigation";
 
 import { BannerSandiDefault } from "@/components/auth/banner-sandi-default";
+import { BannerMasaPaket } from "@/components/layout/banner-masa-paket";
 import { AppShell } from "@/components/layout/app-shell";
 import { RUTE_GANTI_SANDI, RUTE_SESI_BERAKHIR } from "@/lib/auth-const";
 import { akunSesi, sesiSaatIni } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
+import { getStatistikPengingat } from "@/server/queries/pengingat";
 
 // Semua halaman di grup ini membaca SQLite pada tiap permintaan.
 export const dynamic = "force-dynamic";
@@ -28,8 +30,21 @@ export default async function AppLayout({
   if (akun.harusGantiSandi) redirect(RUTE_GANTI_SANDI);
 
   const outlet = await getOutletAktif();
+  const pengingat = await getStatistikPengingat(outlet.id);
+
+  /**
+   * Nomor bantuan dari env, bukan ditanam di kode. Kalau belum diisi, kartu
+   * bantuannya disembunyikan — lebih baik tidak ada daripada menautkan ke
+   * nomor contoh yang tidak dijawab siapa pun.
+   */
+  const waBantuan = process.env.SYNONA_WA_BANTUAN?.trim() || null;
 
   const paket = outlet.plan.charAt(0).toUpperCase() + outlet.plan.slice(1);
+  // Peringatan muncul mulai 7 hari sebelum berakhir, dan tetap muncul setelah lewat.
+  const sisaHariPaket =
+    outlet.planEndsAt === null
+      ? null
+      : differenceInCalendarDays(new Date(outlet.planEndsAt), new Date());
   const berlakuSampai = outlet.planEndsAt
     ? format(new Date(outlet.planEndsAt), "d MMM yyyy", { locale: localeId })
     : "—";
@@ -41,9 +56,13 @@ export default async function AppLayout({
       namaOutlet={outlet.name}
       paket={paket}
       berlakuSampai={berlakuSampai}
-      jumlahNotifikasi={3}
+      jumlahNotifikasi={pengingat.menunggu}
+      waBantuan={waBantuan}
     >
       {akun.sandiMasihDefault && <BannerSandiDefault />}
+      {sisaHariPaket !== null && sisaHariPaket <= 7 && (
+        <BannerMasaPaket sisaHari={sisaHariPaket} />
+      )}
       {children}
     </AppShell>
   );

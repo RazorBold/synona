@@ -15,6 +15,7 @@ import { GambarProduk } from "@/components/ui/gambar-produk";
 import { cn } from "@/lib/utils";
 import { ambilRiwayatStok, sesuaikanStok } from "@/server/actions/produk";
 import type { BarisProduk, RiwayatStok } from "@/server/queries/produk";
+import { aman } from "@/lib/aksi";
 
 type Mode = "masuk" | "keluar" | "opname";
 
@@ -75,7 +76,9 @@ export function StokDialog({
     setCatatan("");
     setError(null);
     setRiwayat([]);
-    void ambilRiwayatStok(produk.id).then(setRiwayat);
+    void ambilRiwayatStok(produk.id)
+      .then(setRiwayat)
+      .catch(() => setRiwayat([]));
   }, [open, produk]);
 
   if (!produk) return null;
@@ -94,12 +97,12 @@ export function StokDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await sesuaikanStok({
+    const hasil = await aman(sesuaikanStok({
       productId: produk.id,
       mode,
       jumlah,
       catatan: catatan.trim() || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

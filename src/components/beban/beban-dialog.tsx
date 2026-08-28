@@ -9,6 +9,7 @@ import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { simpanBeban } from "@/server/actions/beban";
 import type { BarisBeban, KategoriBeban } from "@/server/queries/beban";
+import { aman } from "@/lib/aksi";
 
 export const KATEGORI: { key: KategoriBeban; label: string; emoji: string }[] = [
   { key: "listrik", label: "Listrik & Air", emoji: "💡" },
@@ -67,7 +68,7 @@ export function BebanDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await simpanBeban({
+    const hasil = await aman(simpanBeban({
       id: beban?.id ?? null,
       kategori,
       nama,
@@ -76,7 +77,7 @@ export function BebanDialog({
       berulang,
       tanggal,
       catatan: catatan.trim() || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

@@ -9,6 +9,7 @@ import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { simpanProduk } from "@/server/actions/produk";
 import type { BarisProduk } from "@/server/queries/produk";
+import { aman } from "@/lib/aksi";
 
 const EMOJI = [
   "📦", "🍚", "🛢️", "🥚", "🌾", "🥛", "☕", "🍵", "💧", "🍹",
@@ -120,7 +121,7 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
     if (fotoBaru) fd.set("gambar", fotoBaru);
     if (hapusFoto && !fotoBaru) fd.set("hapusGambar", "1");
 
-    const hasil = await simpanProduk(fd);
+    const hasil = await aman(simpanProduk(fd));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

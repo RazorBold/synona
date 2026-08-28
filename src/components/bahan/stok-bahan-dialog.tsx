@@ -9,6 +9,7 @@ import { formatJumlahBahan } from "@/lib/satuan";
 import { cn } from "@/lib/utils";
 import { ambilRiwayatBahan, sesuaikanStokBahan } from "@/server/actions/bahan";
 import type { BarisBahan, PergerakanBahan } from "@/server/queries/bahan";
+import { aman } from "@/lib/aksi";
 
 const MODE = [
   { key: "masuk", label: "Tambah", ket: "koreksi lebih" },
@@ -46,7 +47,9 @@ export function StokBahanDialog({
     setCatatan("");
     setError(null);
     setRiwayat([]);
-    void ambilRiwayatBahan(bahan.id).then(setRiwayat);
+    void ambilRiwayatBahan(bahan.id)
+      .then(setRiwayat)
+      .catch(() => setRiwayat([]));
   }, [open, bahan]);
 
   if (!bahan) return null;
@@ -63,12 +66,12 @@ export function StokBahanDialog({
     if (!bahan) return;
     setPending(true);
     setError(null);
-    const hasil = await sesuaikanStokBahan({
+    const hasil = await aman(sesuaikanStokBahan({
       materialId: bahan.id,
       mode,
       jumlah,
       catatan: catatan.trim() || null,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);

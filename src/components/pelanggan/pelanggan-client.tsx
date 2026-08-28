@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { buildWaLink, pesanPengingatUtang } from "@/lib/wa";
 import { arsipkanPelanggan } from "@/server/actions/pelanggan";
 import type { BarisPelanggan } from "@/server/queries/pelanggan";
+import { aman } from "@/lib/aksi";
 
 type Statistik = {
   jumlah: number;
@@ -93,7 +94,7 @@ export function PelangganClient({
       )
     )
       return;
-    const hasil = await arsipkanPelanggan(p.id);
+    const hasil = await aman(arsipkanPelanggan(p.id));
     if (!hasil.ok) alert(hasil.error);
   }
 

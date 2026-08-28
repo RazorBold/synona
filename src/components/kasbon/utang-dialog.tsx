@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { businessDate, tambahHari } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
 import { tambahUtang } from "@/server/actions/kasbon";
+import { aman } from "@/lib/aksi";
 
 /** Mencatat kasbon manual — utang yang tidak berasal dari transaksi POS. */
 export function UtangDialog({
@@ -38,11 +39,11 @@ export function UtangDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await tambahUtang({
+    const hasil = await aman(tambahUtang({
       customerId,
       jumlah,
       jatuhTempo: jatuhTempo || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

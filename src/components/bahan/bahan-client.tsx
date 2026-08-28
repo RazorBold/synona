@@ -25,6 +25,7 @@ import { formatJumlahBahan, hargaPerSatuanBesar } from "@/lib/satuan";
 import { cn } from "@/lib/utils";
 import { arsipkanBahan, bayarHutangSupplier } from "@/server/actions/bahan";
 import type { BarisBahan, BarisPembelian } from "@/server/queries/bahan";
+import { aman } from "@/lib/aksi";
 
 type Statistik = {
   jumlah: number;
@@ -58,7 +59,7 @@ export function BahanClient({
 
   async function arsipkan(b: BarisBahan) {
     if (!confirm(`Arsipkan bahan "${b.nama}"?`)) return;
-    const hasil = await arsipkanBahan(b.id);
+    const hasil = await aman(arsipkanBahan(b.id));
     if (!hasil.ok) alert(hasil.error);
   }
 
@@ -68,12 +69,12 @@ export function BahanClient({
       String(p.sisa),
     );
     if (!isi) return;
-    const hasil = await bayarHutangSupplier({
+    const hasil = await aman(bayarHutangSupplier({
       purchaseId: p.id,
       jumlah: Number(isi),
       metode: "cash",
       catatan: null,
-    });
+    }));
     if (!hasil.ok) alert(hasil.error);
   }
 

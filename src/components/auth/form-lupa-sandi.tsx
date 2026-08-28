@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { inputKelas, tombolKelas } from "@/components/auth/kartu-auth";
 import { pulihkanSandi } from "@/server/actions/auth";
+import { aman } from "@/lib/aksi";
 
 export function FormLupaSandi() {
   const [namaPengguna, setNamaPengguna] = useState("");
@@ -19,15 +20,9 @@ export function FormLupaSandi() {
     setPending(true);
     setError(null);
 
-    try {
-      // Sukses tidak kembali ke sini: aksinya berakhir dengan redirect().
-      const hasil = await pulihkanSandi({ namaPengguna, kode, sandiBaru, ulangiSandi });
-      if (!hasil.ok) {
-        setError(hasil.error);
-        setPending(false);
-      }
-    } catch {
-      setError("Gagal menghubungi server. Periksa koneksi, lalu coba lagi.");
+    const hasil = await aman(pulihkanSandi({ namaPengguna, kode, sandiBaru, ulangiSandi }));
+    if (!hasil.ok) {
+      setError(hasil.error);
       setPending(false);
     }
   }

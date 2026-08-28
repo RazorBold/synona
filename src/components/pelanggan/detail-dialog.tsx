@@ -55,7 +55,10 @@ export function DetailPelangganDialog({
       setTransaksi(r.transaksi);
       setUtang(r.utang);
       setMuat(false);
-    });
+    })
+      // Gagal memuat riwayat tidak boleh meninggalkan dialog
+      // berputar selamanya — hentikan pemuatannya.
+      .catch(() => setMuat(false));
   }, [open, pelanggan]);
 
   if (!pelanggan) return null;

@@ -10,6 +10,7 @@ import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ambilRiwayatCicilan, catatPembayaran } from "@/server/actions/kasbon";
 import type { BarisUtangKasbon, Cicilan } from "@/server/queries/kasbon";
+import { aman } from "@/lib/aksi";
 
 const METODE: { key: "cash" | "qris" | "transfer" | "other"; label: string }[] = [
   { key: "cash", label: "Tunai" },
@@ -51,7 +52,9 @@ export function BayarDialog({
     setCatatan("");
     setError(null);
     setCicilan([]);
-    void ambilRiwayatCicilan(utang.id).then(setCicilan);
+    void ambilRiwayatCicilan(utang.id)
+      .then(setCicilan)
+      .catch(() => setCicilan([]));
   }, [open, utang]);
 
   if (!utang) return null;
@@ -75,12 +78,12 @@ export function BayarDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await catatPembayaran({
+    const hasil = await aman(catatPembayaran({
       debtId: utang.id,
       jumlah,
       metode,
       catatan: catatan.trim() || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

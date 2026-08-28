@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { inputKelas, tombolKelas } from "@/components/auth/kartu-auth";
 import { masuk } from "@/server/actions/auth";
+import { aman } from "@/lib/aksi";
 
 export function FormMasuk({ lanjut }: { lanjut: string | null }) {
   const [namaPengguna, setNamaPengguna] = useState("");
@@ -17,18 +18,10 @@ export function FormMasuk({ lanjut }: { lanjut: string | null }) {
     setPending(true);
     setError(null);
 
-    try {
-      // Sukses tidak pernah kembali ke sini: aksinya berakhir dengan redirect().
-      const hasil = await masuk({ namaPengguna, sandi, lanjut });
-      if (!hasil.ok) {
-        setError(hasil.error);
-        setSandi("");
-        setPending(false);
-      }
-    } catch {
-      // Tanpa ini tombolnya berputar selamanya dan pengguna tidak tahu
-      // apakah percobaannya sudah masuk atau belum.
-      setError("Gagal menghubungi server. Periksa koneksi, lalu coba lagi.");
+    const hasil = await aman(masuk({ namaPengguna, sandi, lanjut }));
+    if (!hasil.ok) {
+      setError(hasil.error);
+      setSandi("");
       setPending(false);
     }
   }

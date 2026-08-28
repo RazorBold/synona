@@ -26,6 +26,7 @@ import {
   simpanStaf,
 } from "@/server/actions/outlet";
 import type { BarisOutlet, BarisStaf } from "@/server/queries/outlet";
+import { aman } from "@/lib/aksi";
 
 export function OutletClient({
   outlet,
@@ -51,7 +52,7 @@ export function OutletClient({
 
   async function nonaktifkan(s: BarisStaf) {
     if (!confirm(`Nonaktifkan ${s.nama} dari ${s.namaOutlet}?`)) return;
-    const hasil = await nonaktifkanStaf(s.id);
+    const hasil = await aman(nonaktifkanStaf(s.id));
     if (!hasil.ok) alert(hasil.error);
   }
 
@@ -364,12 +365,12 @@ function OutletDialog({
   async function simpan() {
     setPending(true);
     setError(null);
-    const hasil = await simpanOutlet({
+    const hasil = await aman(simpanOutlet({
       id: outlet?.id ?? null,
       nama,
       alamat: alamat.trim() || null,
       telepon: telepon.trim() || null,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);
@@ -456,14 +457,14 @@ function StafDialog({
   async function simpan() {
     setPending(true);
     setError(null);
-    const hasil = await simpanStaf({
+    const hasil = await aman(simpanStaf({
       id: staf?.id ?? null,
       outletId,
       nama,
       email,
       telepon: telepon.trim() || null,
       peran,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);
@@ -571,10 +572,10 @@ function ProfilDialog({
   async function simpan() {
     setPending(true);
     setError(null);
-    const hasil = await simpanProfilPemilik({
+    const hasil = await aman(simpanProfilPemilik({
       nama,
       telepon: telepon.trim() || null,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);

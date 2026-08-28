@@ -126,6 +126,10 @@ npm run auth:reset -- kasir1  # akun lain
 
 Sandi barunya acak dan ditulis ke `.sandi-baru.txt` (mode 600, sudah di-gitignore) — tidak dicetak ke terminal, karena keluaran terminal gampang tersimpan di riwayat shell atau log pm2.
 
+### Nomor bantuan WhatsApp
+
+Kartu "Butuh bantuan?" di sidebar hanya muncul kalau `SYNONA_WA_BANTUAN` diisi di `.env` (format `62812…`, tanpa `+` atau spasi). Kalau kosong, kartunya disembunyikan — lebih baik tidak ada daripada menautkan ke nomor contoh yang tidak dijawab siapa pun.
+
 ### Sesi yang akunnya sudah tidak ada
 
 Kalau cookie masih sah tapi baris `pengguna`-nya hilang (kasir dihapus, DB dipulihkan dari backup, `db:reset`), permintaan dialihkan ke route handler `/sesi-berakhir` yang **menghapus cookie** lalu melempar ke `/masuk`.
@@ -145,6 +149,14 @@ Ini konsekuensi yang harus diketahui sebelum memakainya:
 - **Tidak ada daftar sesi di database.** Token yang sudah diterbitkan tetap sah sampai `exp`-nya lewat (30 hari), termasuk setelah pemiliknya ganti sandi.
 - **Mencabut akses = mengganti `SYNONA_JWT_SECRET`.** Itu membatalkan *semua* token sekaligus dan memaksa setiap perangkat login ulang — tidak bisa hanya satu perangkat.
 - Kalau nanti butuh pencabutan per-sesi (mis. "keluarkan HP yang hilang"), sesi harus dipindah ke tabel di database; JWT tanpa daftar sesi tidak bisa memberikannya.
+
+## Penanganan galat di sisi klien
+
+Server action bisa **melempar**, bukan cuma mengembalikan `{ ok: false }` — sesi habis (middleware menjawab 401), jaringan putus, atau galat tak terduga. Karena itu setiap pemanggilan aksi dari komponen dibungkus `aman()` (`src/lib/aksi.ts`), yang mengubah lemparan jadi hasil `ok: false` biasa.
+
+Tanpa pembungkus itu, promise-nya ditolak, baris `setPending(false)` di bawahnya tidak pernah jalan, dan **tombolnya berputar selamanya** tanpa pesan apa pun. `aman()` sengaja meneruskan lemparan `NEXT_REDIRECT`, karena `redirect()` di server action memang bekerja dengan cara melempar.
+
+Galat render ditangani `src/app/error.tsx` (dan `global-error.tsx` sebagai jaring terakhir), sementara alamat yang tidak ada masuk ke `src/app/not-found.tsx`. Ketiganya berbahasa Indonesia — bawaan Next adalah layar Inggris "Application error: a client-side exception has occurred" yang tidak berarti apa-apa bagi pemilik warung.
 
 ## Catatan deploy
 

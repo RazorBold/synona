@@ -6,7 +6,21 @@ import { getDaftarProduk, getStatistikProduk } from "@/server/queries/produk";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProdukPage() {
+const STATUS_SAH = ["semua", "menipis", "habis"] as const;
+type Status = (typeof STATUS_SAH)[number];
+
+export default async function ProdukPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter } = await searchParams;
+  // Kartu "stok menipis" di dashboard menaut ke ?filter=menipis. Nilai yang
+  // tidak dikenal diabaikan, bukan bikin halaman kosong.
+  const statusAwal: Status = STATUS_SAH.includes(filter as Status)
+    ? (filter as Status)
+    : "semua";
+
   const outlet = await getOutletAktif();
 
   const [produk, kategori, statistik, bahan] = await Promise.all([
@@ -22,6 +36,7 @@ export default async function ProdukPage() {
       kategori={kategori}
       statistik={statistik}
       bahan={bahan}
+      statusAwal={statusAwal}
     />
   );
 }

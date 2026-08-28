@@ -12,6 +12,7 @@ type Props = {
   paket: string;
   berlakuSampai: string;
   jumlahNotifikasi: number;
+  waBantuan: string | null;
   children: React.ReactNode;
 };
 
@@ -22,6 +23,7 @@ export function AppShell({
   paket,
   berlakuSampai,
   jumlahNotifikasi,
+  waBantuan,
   children,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -40,6 +42,7 @@ export function AppShell({
         peran={peran}
         paket={paket}
         berlakuSampai={berlakuSampai}
+        waBantuan={waBantuan}
         open={open}
         onClose={() => setOpen(false)}
       />

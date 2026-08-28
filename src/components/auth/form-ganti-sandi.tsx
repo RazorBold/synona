@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { inputKelas, tombolKelas } from "@/components/auth/kartu-auth";
 import { gantiSandi } from "@/server/actions/auth";
+import { aman } from "@/lib/aksi";
 
 export function FormGantiSandi() {
   const [sandiLama, setSandiLama] = useState("");
@@ -18,14 +19,9 @@ export function FormGantiSandi() {
     setPending(true);
     setError(null);
 
-    try {
-      const hasil = await gantiSandi({ sandiLama, sandiBaru, ulangiSandi });
-      if (!hasil.ok) {
-        setError(hasil.error);
-        setPending(false);
-      }
-    } catch {
-      setError("Gagal menghubungi server. Periksa koneksi, lalu coba lagi.");
+    const hasil = await aman(gantiSandi({ sandiLama, sandiBaru, ulangiSandi }));
+    if (!hasil.ok) {
+      setError(hasil.error);
       setPending(false);
     }
   }

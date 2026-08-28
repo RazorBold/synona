@@ -25,6 +25,7 @@ import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { arsipkanProduk } from "@/server/actions/produk";
 import type { BarisProduk } from "@/server/queries/produk";
+import { aman } from "@/lib/aksi";
 
 type Statistik = {
   jumlah: number;
@@ -41,15 +42,18 @@ export function ProdukClient({
   kategori,
   statistik,
   bahan,
+  statusAwal = "semua",
 }: {
   produk: BarisProduk[];
   kategori: { id: string; nama: string }[];
   statistik: Statistik;
   bahan: BarisBahan[];
+  /** Dari ?filter= di URL — dashboard menaut ke sini dengan filter siap pakai. */
+  statusAwal?: Status;
 }) {
   const [cari, setCari] = useState("");
   const [kategoriId, setKategoriId] = useState<string | null>(null);
-  const [status, setStatus] = useState<Status>("semua");
+  const [status, setStatus] = useState<Status>(statusAwal);
 
   const [formOpen, setFormOpen] = useState(false);
   const [stokOpen, setStokOpen] = useState(false);
@@ -96,7 +100,7 @@ export function ProdukClient({
   async function arsipkan(p: BarisProduk) {
     if (!confirm(`Arsipkan "${p.nama}"? Produk disembunyikan dari POS, riwayat penjualannya tetap tersimpan.`))
       return;
-    await arsipkanProduk(p.id);
+    await aman(arsipkanProduk(p.id));
   }
 
   return (

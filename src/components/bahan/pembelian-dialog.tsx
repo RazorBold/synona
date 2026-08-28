@@ -9,6 +9,7 @@ import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { simpanPembelian } from "@/server/actions/bahan";
 import type { BarisBahan } from "@/server/queries/bahan";
+import { aman } from "@/lib/aksi";
 
 type Baris = { materialId: string; jumlah: number; total: number };
 
@@ -53,7 +54,7 @@ export function PembelianDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await simpanPembelian({
+    const hasil = await aman(simpanPembelian({
       supplier: supplier.trim() || null,
       item: baris
         .filter((b) => b.jumlah > 0)
@@ -70,7 +71,7 @@ export function PembelianDialog({
       metode,
       jatuhTempo: sisa > 0 ? jatuhTempo : null,
       catatan: null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

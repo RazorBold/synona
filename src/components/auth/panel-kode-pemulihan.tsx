@@ -4,6 +4,7 @@ import { Check, Copy, KeyRound, Loader2, ShieldAlert, TriangleAlert } from "luci
 import { useState } from "react";
 
 import { buatKodePemulihanBaru } from "@/server/actions/auth";
+import { aman } from "@/lib/aksi";
 
 export function PanelKodePemulihan({
   punyaKode,
@@ -21,7 +22,7 @@ export function PanelKodePemulihan({
     setPending(true);
     setError(null);
     try {
-      const hasil = await buatKodePemulihanBaru();
+      const hasil = await aman(buatKodePemulihanBaru());
       if (hasil.ok) setKode(hasil.kode);
       else setError(hasil.error);
     } catch {

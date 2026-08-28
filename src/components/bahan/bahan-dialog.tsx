@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { SatuanBahan } from "@/lib/satuan";
 import { simpanBahan } from "@/server/actions/bahan";
 import type { BarisBahan } from "@/server/queries/bahan";
+import { aman } from "@/lib/aksi";
 
 const SATUAN: { key: SatuanBahan; label: string; ket: string }[] = [
   { key: "g", label: "Gram", ket: "beras, kopi, gula" },
@@ -52,14 +53,14 @@ export function BahanDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await simpanBahan({
+    const hasil = await aman(simpanBahan({
       id: bahan?.id ?? null,
       nama,
       satuan,
       batasStok,
       stokAwal: stokAwal * faktor,
       hargaAwal,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
