@@ -35,6 +35,7 @@ npm run dev           # http://localhost:3000
 | `npm run db:studio` | Drizzle Studio (penjelajah data) |
 | `npm run auth:init` | Seed akun demo `admin` / `admin` (idempoten) |
 | `npm run auth:reset [nama]` | Reset sandi dari server — jalan terakhir kalau sandi & kode pemulihan hilang |
+| `npm run data:kosongkan` | Hapus data usaha demo, siapkan outlet kosong (pratinjau dulu; butuh `--ya`) |
 
 ## Struktur singkat
 
@@ -149,6 +150,28 @@ Ini konsekuensi yang harus diketahui sebelum memakainya:
 - **Tidak ada daftar sesi di database.** Token yang sudah diterbitkan tetap sah sampai `exp`-nya lewat (30 hari), termasuk setelah pemiliknya ganti sandi.
 - **Mencabut akses = mengganti `SYNONA_JWT_SECRET`.** Itu membatalkan *semua* token sekaligus dan memaksa setiap perangkat login ulang — tidak bisa hanya satu perangkat.
 - Kalau nanti butuh pencabutan per-sesi (mis. "keluarkan HP yang hilang"), sesi harus dipindah ke tabel di database; JWT tanpa daftar sesi tidak bisa memberikannya.
+
+## Mulai dari data sendiri (bukan data demo)
+
+`npm run db:seed` mengisi data demo Bu Sari — 26 produk dan ratusan transaksi fiktif. Sebelum dipakai pemilik sungguhan, kosongkan dulu:
+
+```bash
+npm run data:kosongkan -- "Warung Bu Ani" "Bu Ani"        # pratinjau, tidak mengubah apa pun
+npm run data:kosongkan -- "Warung Bu Ani" "Bu Ani" --ya   # jalankan
+```
+
+Perintah ini membuat backup otomatis ke `data/backup/` lebih dulu, lalu mengosongkan seluruh tabel usaha dan menyiapkan satu outlet kosong. **Akun login di tabel `pengguna` tidak disentuh** — mengosongkan data usaha tidak boleh sekaligus mengunci pemiliknya keluar.
+
+## PWA
+
+Manifest, ikon (termasuk varian maskable), dan service worker sudah terpasang.
+
+**Yang di-cache service worker hanya aset build ber-hash di `/_next/static/`.** Halaman HTML, `/api/`, dan semua permintaan non-GET diteruskan apa adanya ke jaringan. Ini disengaja:
+
+- **Tidak ada mode offline untuk mencatat penjualan.** Menyimpan transaksi ke antrean offline lalu menampilkan "tersimpan" adalah cara tercepat membuat pemilik warung kehilangan uang — struk keluar, stok berkurang di layar, tapi server tidak pernah menerimanya. Offline sungguhan butuh antrean tersinkron dengan penyelesaian konflik, dan itu keputusan produk.
+- **Halaman HTML tidak di-cache** karena isinya bergantung pada sesi; halaman ter-cache bisa memperlihatkan data outlet ke orang yang sudah logout.
+
+> **Pemasangan ke layar utama butuh HTTPS.** Browser hanya mengizinkan service worker dan "Add to Home Screen" di konteks aman. Deployment sekarang masih HTTP di LAN, jadi tombol pasang belum akan muncul sampai TLS dipasang di depan nginx. Manifest dan ikonnya sudah siap dan akan langsung berfungsi begitu itu ada.
 
 ## Penanganan galat di sisi klien
 
