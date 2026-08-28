@@ -16,3 +16,6 @@ data/
 
 *.tsbuildinfo
 .DS_Store
+
+# Sandi hasil `npm run auth:reset` — jangan pernah di-commit
+.sandi-baru.txt

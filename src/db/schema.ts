@@ -563,6 +563,17 @@ export const pengguna = sqliteTable(
       .notNull()
       .default("kasir"),
     harusGantiSandi: integer("harus_ganti_sandi").notNull().default(0),
+    /**
+     * Kode pemulihan sekali pakai, di-hash sama seperti sandi.
+     *
+     * Ini satu-satunya jalan pulih sendiri kalau sandi lupa: deployment ini
+     * tidak punya SMTP, dan wa.me hanya membuka tautan chat — tidak bisa
+     * mengirim pesan otomatis. Jadi kodenya dicatat pemilik saat dibuat.
+     * NULL berarti pemilik belum pernah membuat kode.
+     */
+    kodePemulihanHash: text("kode_pemulihan_hash"),
+    kodePemulihanSalt: text("kode_pemulihan_salt"),
+    kodePemulihanDibuatPada: integer("kode_pemulihan_dibuat_pada"),
     dibuatPada: integer("dibuat_pada")
       .notNull()
       .$defaultFn(() => Date.now()),

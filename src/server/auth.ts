@@ -122,6 +122,8 @@ export type AkunSesi = {
   peran: "pemilik" | "kasir";
   harusGantiSandi: boolean;
   sandiMasihDefault: boolean;
+  punyaKodePemulihan: boolean;
+  kodePemulihanDibuatPada: number | null;
 };
 
 /**
@@ -148,7 +150,70 @@ export async function akunSesi(sesi: SesiAktif): Promise<AkunSesi | null> {
     peran: row.peran,
     harusGantiSandi: row.harusGantiSandi === 1,
     sandiMasihDefault: await cocokkanSandi(SANDI_DEFAULT, row.salt, row.hashSandi),
+    punyaKodePemulihan: Boolean(row.kodePemulihanHash && row.kodePemulihanSalt),
+    kodePemulihanDibuatPada: row.kodePemulihanDibuatPada,
   };
+}
+
+/* -------------------------------------------------- kode pemulihan */
+
+/**
+ * Alfabet tanpa karakter yang mudah tertukar saat disalin dari kertas
+ * (0/O, 1/I/L). Kode ini memang dimaksudkan untuk ditulis tangan.
+ */
+const ABJAD_KODE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const PANJANG_KELOMPOK = 4;
+const JUMLAH_KELOMPOK = 4;
+
+/**
+ * Kode 16 karakter dari alfabet 31 huruf ≈ 79 bit — setara sandi kuat, karena
+ * memang bisa dipakai mengambil alih akun. Formatnya SYN-XXXX-XXXX-XXXX-XXXX.
+ */
+export function buatKodePemulihanAcak(): string {
+  const total = PANJANG_KELOMPOK * JUMLAH_KELOMPOK;
+  const kelompok: string[] = [];
+  let huruf = "";
+
+  // Tolak nilai di atas batas kelipatan supaya distribusinya tetap seragam.
+  const batas = Math.floor(256 / ABJAD_KODE.length) * ABJAD_KODE.length;
+  while (huruf.length < total) {
+    for (const b of crypto.randomBytes(total * 2)) {
+      if (b >= batas) continue;
+      huruf += ABJAD_KODE[b % ABJAD_KODE.length];
+      if (huruf.length === total) break;
+    }
+  }
+
+  for (let i = 0; i < total; i += PANJANG_KELOMPOK) {
+    kelompok.push(huruf.slice(i, i + PANJANG_KELOMPOK));
+  }
+  return `SYN-${kelompok.join("-")}`;
+}
+
+/**
+ * Menyeragamkan kode yang diketik ulang pengguna: huruf kecil, spasi, tanda
+ * hubung yang hilang, dan awalan SYN- yang lupa diketik semuanya diterima.
+ */
+export function normalisasiKodePemulihan(kode: string): string {
+  const bersih = kode.toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^SYN/, "");
+  const kelompok = bersih.match(/.{1,4}/g) ?? [];
+  return `SYN-${kelompok.join("-")}`;
+}
+
+export async function simpanKodePemulihan(penggunaId: string): Promise<string> {
+  const kode = buatKodePemulihanAcak();
+  const salt = buatSalt();
+
+  db.update(pengguna)
+    .set({
+      kodePemulihanSalt: salt,
+      kodePemulihanHash: await hashSandi(kode, salt),
+      kodePemulihanDibuatPada: Date.now(),
+    })
+    .where(eq(pengguna.id, penggunaId))
+    .run();
+
+  return kode;
 }
 
 /* -------------------------------------------------- rate limit login */

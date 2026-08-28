@@ -4,10 +4,11 @@ import { Loader2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import { inputKelas, tombolKelas } from "@/components/auth/kartu-auth";
-import { gantiSandi } from "@/server/actions/auth";
+import { pulihkanSandi } from "@/server/actions/auth";
 
-export function FormGantiSandi() {
-  const [sandiLama, setSandiLama] = useState("");
+export function FormLupaSandi() {
+  const [namaPengguna, setNamaPengguna] = useState("");
+  const [kode, setKode] = useState("");
   const [sandiBaru, setSandiBaru] = useState("");
   const [ulangiSandi, setUlangiSandi] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +20,8 @@ export function FormGantiSandi() {
     setError(null);
 
     try {
-      const hasil = await gantiSandi({ sandiLama, sandiBaru, ulangiSandi });
+      // Sukses tidak kembali ke sini: aksinya berakhir dengan redirect().
+      const hasil = await pulihkanSandi({ namaPengguna, kode, sandiBaru, ulangiSandi });
       if (!hasil.ok) {
         setError(hasil.error);
         setPending(false);
@@ -33,18 +35,37 @@ export function FormGantiSandi() {
   return (
     <form onSubmit={kirim} className="mt-6">
       <div>
-        <label htmlFor="sandiLama" className="text-sm font-semibold text-ink">
-          Sandi sekarang
+        <label htmlFor="namaPengguna" className="text-sm font-semibold text-ink">
+          Nama pengguna
         </label>
         <input
-          id="sandiLama"
-          type="password"
-          autoComplete="current-password"
+          id="namaPengguna"
+          autoComplete="username"
           autoFocus
-          value={sandiLama}
-          onChange={(e) => setSandiLama(e.target.value)}
+          autoCapitalize="none"
+          spellCheck={false}
+          value={namaPengguna}
+          onChange={(e) => setNamaPengguna(e.target.value)}
           className={inputKelas}
         />
+      </div>
+
+      <div className="mt-4">
+        <label htmlFor="kode" className="text-sm font-semibold text-ink">
+          Kode pemulihan
+        </label>
+        <input
+          id="kode"
+          autoCapitalize="characters"
+          spellCheck={false}
+          placeholder="SYN-XXXX-XXXX-XXXX-XXXX"
+          value={kode}
+          onChange={(e) => setKode(e.target.value)}
+          className={`${inputKelas} tabular tracking-wide`}
+        />
+        <p className="mt-1.5 text-xs text-muted">
+          Huruf besar/kecil dan tanda hubung tidak masalah.
+        </p>
       </div>
 
       <div className="mt-4">
@@ -84,11 +105,11 @@ export function FormGantiSandi() {
 
       <button
         type="submit"
-        disabled={pending || !sandiLama || !sandiBaru || !ulangiSandi}
+        disabled={pending || !namaPengguna.trim() || !kode.trim() || !sandiBaru || !ulangiSandi}
         className={tombolKelas}
       >
         {pending && <Loader2 className="size-4 animate-spin" />}
-        Simpan Sandi Baru
+        Pulihkan Akses
       </button>
     </form>
   );

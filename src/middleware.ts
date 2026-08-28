@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { NAMA_COOKIE_SESI, RUTE_MASUK } from "@/lib/auth-const";
+import { NAMA_COOKIE_SESI, RUTE_LUPA_SANDI, RUTE_MASUK } from "@/lib/auth-const";
 import { bacaToken } from "@/lib/jwt";
 
 /**
@@ -16,7 +16,11 @@ import { bacaToken } from "@/lib/jwt";
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
-  if (pathname === RUTE_MASUK) return NextResponse.next();
+  // Halaman yang HARUS bisa dibuka tanpa sesi. /lupa-sandi termasuk: kalau
+  // tidak, orang yang lupa sandinya justru dilempar ke /masuk terus-menerus.
+  if (pathname === RUTE_MASUK || pathname === RUTE_LUPA_SANDI) {
+    return NextResponse.next();
+  }
 
   /**
    * Aset statis di public/ (bg.png, ikon) harus tetap termuat di halaman

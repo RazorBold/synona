@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { pengguna } from "@/db/schema";
-import { RUTE_MASUK } from "@/lib/auth-const";
+import { RUTE_GANTI_SANDI, RUTE_MASUK } from "@/lib/auth-const";
 import {
   bolehCobaLogin,
   buatSalt,
@@ -16,7 +16,9 @@ import {
   hapusSesi,
   hashSandi,
   periksaKekuatanSandi,
+  normalisasiKodePemulihan,
   resetLoginGagal,
+  simpanKodePemulihan,
   sisaMenitBlokir,
   wajibSesi,
 } from "@/server/auth";
@@ -140,4 +142,112 @@ export async function gantiSandi(input: unknown): Promise<HasilAksi> {
   });
 
   redirect("/");
+}
+
+/* ------------------------------------------------- pemulihan sandi */
+
+/**
+ * Membuat kode pemulihan baru dan mengembalikannya SEKALI.
+ *
+ * Setelah ini hanya hash-nya yang tersimpan; kalau pemilik tidak mencatatnya,
+ * satu-satunya jalan adalah membuat kode baru lagi (selama masih bisa masuk)
+ * atau `npm run auth:reset` di server.
+ */
+export async function buatKodePemulihanBaru(): Promise<
+  { ok: true; kode: string } | { ok: false; error: string }
+> {
+  const s = await wajibSesi();
+  const kode = await simpanKodePemulihan(s.penggunaId);
+  return { ok: true, kode };
+}
+
+const PulihInput = z.object({
+  namaPengguna: z.string().trim().min(1, "Nama pengguna wajib diisi").max(64),
+  kode: z.string().trim().min(1, "Kode pemulihan wajib diisi").max(64),
+  sandiBaru: z.string().min(1, "Sandi baru wajib diisi").max(200),
+  ulangiSandi: z.string().min(1, "Ulangi sandi baru").max(200),
+});
+
+/**
+ * Memulihkan akses dengan kode pemulihan, tanpa perlu sandi lama.
+ *
+ * Kodenya sekali pakai: begitu terpakai, kolomnya dikosongkan supaya kode yang
+ * sama tidak bisa diputar ulang oleh orang lain yang sempat melihatnya.
+ */
+export async function pulihkanSandi(input: unknown): Promise<HasilAksi> {
+  const parsed = PulihInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const { sandiBaru, ulangiSandi } = parsed.data;
+  const namaPengguna = parsed.data.namaPengguna.toLowerCase();
+  const kunciBatas = `pulih:${namaPengguna}`;
+
+  if (!bolehCobaLogin(kunciBatas)) {
+    return {
+      ok: false,
+      error: `Terlalu banyak percobaan gagal. Coba lagi dalam ${sisaMenitBlokir(kunciBatas)} menit.`,
+    };
+  }
+
+  if (sandiBaru !== ulangiSandi) {
+    return { ok: false, error: "Sandi baru dan ulangannya tidak sama" };
+  }
+  const lemah = periksaKekuatanSandi(sandiBaru);
+  if (lemah) return { ok: false, error: lemah };
+
+  const akun = db
+    .select()
+    .from(pengguna)
+    .where(eq(pengguna.namaPengguna, namaPengguna))
+    .get();
+
+  /**
+   * Satu pesan seragam untuk semua kegagalan — nama pengguna tidak ada, belum
+   * punya kode, atau kodenya salah. Membedakannya akan memberi tahu penebak
+   * nama pengguna mana yang nyata.
+   */
+  const GAGAL = {
+    ok: false as const,
+    error: "Nama pengguna atau kode pemulihan salah",
+  };
+
+  if (!akun?.kodePemulihanHash || !akun.kodePemulihanSalt) {
+    catatLoginGagal(kunciBatas);
+    return GAGAL;
+  }
+
+  const kode = normalisasiKodePemulihan(parsed.data.kode);
+  if (!(await cocokkanSandi(kode, akun.kodePemulihanSalt, akun.kodePemulihanHash))) {
+    catatLoginGagal(kunciBatas);
+    return GAGAL;
+  }
+
+  const salt = buatSalt();
+  db.update(pengguna)
+    .set({
+      salt,
+      hashSandi: await hashSandi(sandiBaru, salt),
+      harusGantiSandi: 0,
+      // Sekali pakai.
+      kodePemulihanHash: null,
+      kodePemulihanSalt: null,
+      kodePemulihanDibuatPada: null,
+    })
+    .where(eq(pengguna.id, akun.id))
+    .run();
+
+  resetLoginGagal(kunciBatas);
+  resetLoginGagal(namaPengguna);
+
+  await buatSesi({
+    penggunaId: akun.id,
+    namaPengguna: akun.namaPengguna,
+    peran: akun.peran,
+  });
+
+  // Ke halaman ganti sandi: kodenya sudah terpakai, dan di sana pemilik
+  // langsung diminta membuat kode pemulihan yang baru.
+  redirect(RUTE_GANTI_SANDI);
 }

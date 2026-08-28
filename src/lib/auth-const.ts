@@ -12,6 +12,10 @@ export const UMUR_SESI_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const RUTE_MASUK = "/masuk";
 export const RUTE_GANTI_SANDI = "/ganti-sandi";
+export const RUTE_LUPA_SANDI = "/lupa-sandi";
+
+/** Route handler yang membersihkan cookie sesi yang sudah tidak sah. */
+export const RUTE_SESI_BERAKHIR = "/sesi-berakhir";
 
 /** Akun demo yang di-seed `npm run auth:init`. */
 export const PENGGUNA_DEFAULT = "admin";

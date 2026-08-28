@@ -17,11 +17,18 @@ export function FormMasuk({ lanjut }: { lanjut: string | null }) {
     setPending(true);
     setError(null);
 
-    // Sukses tidak pernah kembali ke sini: aksinya berakhir dengan redirect().
-    const hasil = await masuk({ namaPengguna, sandi, lanjut });
-    if (!hasil.ok) {
-      setError(hasil.error);
-      setSandi("");
+    try {
+      // Sukses tidak pernah kembali ke sini: aksinya berakhir dengan redirect().
+      const hasil = await masuk({ namaPengguna, sandi, lanjut });
+      if (!hasil.ok) {
+        setError(hasil.error);
+        setSandi("");
+        setPending(false);
+      }
+    } catch {
+      // Tanpa ini tombolnya berputar selamanya dan pengguna tidak tahu
+      // apakah percobaannya sudah masuk atau belum.
+      setError("Gagal menghubungi server. Periksa koneksi, lalu coba lagi.");
       setPending(false);
     }
   }

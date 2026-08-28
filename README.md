@@ -34,6 +34,7 @@ npm run dev           # http://localhost:3000
 | `npm run db:reset` | Hapus DB → migrasi → seed |
 | `npm run db:studio` | Drizzle Studio (penjelajah data) |
 | `npm run auth:init` | Seed akun demo `admin` / `admin` (idempoten) |
+| `npm run auth:reset [nama]` | Reset sandi dari server — jalan terakhir kalau sandi & kode pemulihan hilang |
 
 ## Struktur singkat
 
@@ -105,6 +106,31 @@ Middleware saja **tidak cukup**: server action dipanggil lewat POST ke URL halam
 ### Akun demo
 
 `npm run auth:init` membuat akun `admin` dengan sandi `admin`. **Ini kredensial demo, bukan kredensial produksi** — ganti di `/ganti-sandi` sebelum aplikasi dipakai dengan data pelanggan sungguhan. Selama sandi bawaan itu masih aktif, aplikasi menampilkan banner peringatan di setiap halaman; banner hilang sendiri setelah sandinya diganti (dideteksi dengan mencocokkan hash, bukan flag terpisah yang bisa basi).
+
+### Lupa sandi
+
+Deployment ini tidak punya SMTP, dan `wa.me` hanya membuka tautan chat — tidak bisa mengirim pesan otomatis. Jadi pemulihannya memakai **kode pemulihan** yang dicatat sendiri oleh pemilik, bukan tautan reset lewat email.
+
+1. Saat sudah masuk, buka **Ganti Sandi** → **Buat kode pemulihan**. Kodenya berbentuk `SYN-XXXX-XXXX-XXXX-XXXX` dan **hanya ditampilkan sekali** — catat di tempat aman.
+2. Kalau sandinya lupa, buka `/lupa-sandi`, masukkan nama pengguna + kode itu + sandi baru.
+3. Kode bersifat **sekali pakai**: setelah terpakai, kolomnya dikosongkan. Buat kode baru setelah masuk.
+
+Yang disimpan di database hanya hash kodenya (scrypt + salt), sama seperti sandi — kode aslinya tidak bisa dibaca ulang dari DB.
+
+Kalau sandi **dan** kode pemulihan sama-sama hilang, jalan terakhirnya di server:
+
+```bash
+npm run auth:reset            # akun "admin"
+npm run auth:reset -- kasir1  # akun lain
+```
+
+Sandi barunya acak dan ditulis ke `.sandi-baru.txt` (mode 600, sudah di-gitignore) — tidak dicetak ke terminal, karena keluaran terminal gampang tersimpan di riwayat shell atau log pm2.
+
+### Sesi yang akunnya sudah tidak ada
+
+Kalau cookie masih sah tapi baris `pengguna`-nya hilang (kasir dihapus, DB dipulihkan dari backup, `db:reset`), permintaan dialihkan ke route handler `/sesi-berakhir` yang **menghapus cookie** lalu melempar ke `/masuk`.
+
+Ini bukan detail kosmetik: tanpa penghapusan cookie, `/` mengalihkan ke `/masuk`, lalu `/masuk` melihat token yang masih sah dan memantulkannya balik — pengguna terkunci dalam redirect tak berujung dan tombol Keluar pun tidak bisa diklik karena tidak ada halaman yang berhasil dimuat. Cookie hanya dihapus kalau sesinya memang sudah tidak sah, supaya rute GET ini tidak bisa dipakai halaman lain sebagai logout paksa.
 
 ### Secret JWT
 
