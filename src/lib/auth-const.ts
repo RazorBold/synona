@@ -11,6 +11,9 @@ export const NAMA_COOKIE_SESI = "synona_sesi";
 export const UMUR_SESI_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const RUTE_MASUK = "/masuk";
+
+/** Halaman depan publik — satu-satunya layar yang boleh dilihat tanpa sesi. */
+export const RUTE_BERANDA = "/beranda";
 export const RUTE_GANTI_SANDI = "/ganti-sandi";
 export const RUTE_LUPA_SANDI = "/lupa-sandi";
 

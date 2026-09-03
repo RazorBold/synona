@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
 
 import { DaftarSW } from "@/components/layout/daftar-sw";
 
@@ -8,6 +8,17 @@ import "./globals.css";
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
+  display: "swap",
+});
+
+/**
+ * Serif berkontras tinggi, dipakai HANYA di halaman depan (/beranda).
+ * Aplikasi di dalamnya tetap memakai Jakarta Sans — halaman pemasaran boleh
+ * bersuara lebih tegas, layar kerja harian tidak.
+ */
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-serif",
   display: "swap",
 });
 
@@ -38,7 +49,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="id" className={jakarta.variable}>
+    <html lang="id" className={`${jakarta.variable} ${playfair.variable}`}>
       <body>
         {children}
         <DaftarSW />

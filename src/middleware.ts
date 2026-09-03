@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { NAMA_COOKIE_SESI, RUTE_LUPA_SANDI, RUTE_MASUK } from "@/lib/auth-const";
+import {
+  NAMA_COOKIE_SESI,
+  RUTE_BERANDA,
+  RUTE_LUPA_SANDI,
+  RUTE_MASUK,
+} from "@/lib/auth-const";
 import { bacaToken } from "@/lib/jwt";
 
 /**
@@ -18,7 +23,13 @@ export async function middleware(req: NextRequest) {
 
   // Halaman yang HARUS bisa dibuka tanpa sesi. /lupa-sandi termasuk: kalau
   // tidak, orang yang lupa sandinya justru dilempar ke /masuk terus-menerus.
-  if (pathname === RUTE_MASUK || pathname === RUTE_LUPA_SANDI) {
+  // /beranda adalah halaman depan publik — ia memang untuk orang yang belum
+  // punya akun sama sekali.
+  if (
+    pathname === RUTE_MASUK ||
+    pathname === RUTE_LUPA_SANDI ||
+    pathname === RUTE_BERANDA
+  ) {
     return NextResponse.next();
   }
 
@@ -46,7 +57,7 @@ export async function middleware(req: NextRequest) {
    * Redirect dibangun dari header Host yang diteruskan nginx, BUKAN dari
    * `req.nextUrl`.
    *
-   * `req.nextUrl` memakai origin proses itu sendiri (127.0.0.1:5028) — port
+   * `req.nextUrl` memakai origin proses itu sendiri (127.0.0.1:8029) — port
    * internal yang, setelah listener dikunci ke localhost, tidak bisa
    * dijangkau klien. Location relatif juga bukan pilihan: middleware Next 15
    * mem-parse header Location sebagai URL absolut dan menolak "/masuk"
@@ -61,8 +72,20 @@ export async function middleware(req: NextRequest) {
   const host =
     req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
 
-  const lanjut =
-    pathname === "/" ? "" : `?lanjut=${encodeURIComponent(`${pathname}${search}`)}`;
+  /**
+   * Pengunjung yang mendarat di akar situs belum tentu punya akun — ia
+   * dibawa ke halaman depan, bukan ke formulir masuk. Tautan dalam
+   * (mis. /laporan) tetap ke /masuk dengan `?lanjut=` supaya setelah masuk
+   * ia mendarat di halaman yang tadi dituju.
+   */
+  if (pathname === "/") {
+    return NextResponse.redirect(
+      new URL(RUTE_BERANDA, `${proto}://${host}`),
+      307,
+    );
+  }
+
+  const lanjut = `?lanjut=${encodeURIComponent(`${pathname}${search}`)}`;
 
   return NextResponse.redirect(
     new URL(`${RUTE_MASUK}${lanjut}`, `${proto}://${host}`),

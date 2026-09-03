@@ -6,6 +6,13 @@
 ------------------------------------------------------------------- */
 @theme {
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-serif), ui-serif, Georgia, serif;
+
+  /* Halaman depan (/beranda) — diambil dari src/images/bg.png */
+  --color-krem: #fcede0;
+  --color-kartu-biru: #71a7fd;
+  --color-kartu-hijau: #a1cb68;
+  --color-kartu-merah: #ea5d5b;
 
   /* Merek */
   --color-brand-50: #f1efff;
