@@ -14,6 +14,7 @@
     "auth:init": "tsx src/db/seed-auth.ts",
     "auth:reset": "tsx src/db/reset-auth.ts",
     "data:kosongkan": "tsx src/db/kosongkan-usaha.ts",
+    "contoh:aksesoris": "tsx src/db/contoh-aksesoris.ts",
     "db:studio": "drizzle-kit studio",
     "db:reset": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\" && npm run db:migrate && npm run db:seed"
   },
