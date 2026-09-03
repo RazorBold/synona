@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * URL absolut berdasarkan Host yang diteruskan nginx — `req.nextUrl` memakai
- * origin proses (127.0.0.1:5028) yang tidak bisa dijangkau klien. Sama seperti
+ * origin proses (127.0.0.1:8029) yang tidak bisa dijangkau klien. Sama seperti
  * di src/middleware.ts.
  */
 function asalPermintaan(req: NextRequest, path: string): URL {

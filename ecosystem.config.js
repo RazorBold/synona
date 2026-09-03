@@ -56,9 +56,11 @@ module.exports = {
       env: {
         ...bacaEnvRahasia(),
         NODE_ENV: "production",
-        PORT: 5028,
+        // Port INTERNAL, bukan alamat yang dibuka ke LAN. Yang diakses orang
+        // adalah port 5028 milik nginx, yang meneruskan ke sini.
+        PORT: 8029,
         // Hanya localhost. Akses dari luar HARUS lewat nginx
-        // (/etc/nginx/sites-available/synona → port 8029), yang meneruskan
+        // (/etc/nginx/sites-available/synona → port 5028), yang meneruskan
         // X-Forwarded-Proto sehingga cookie sesi tahu kapan harus `secure`.
         HOSTNAME: "127.0.0.1",
         // Absolut supaya DB dan foto produk tidak ikut berpindah kalau cwd berubah.
