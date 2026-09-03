@@ -3,15 +3,19 @@
 import {
   ChefHat,
   ChevronRight,
+  ClipboardList,
   Clock,
   Crown,
   FileText,
   Home,
+  Landmark,
   LogOut,
   MessageCircleQuestion,
   Package,
   PiggyBank,
   ReceiptText,
+  Scissors,
+  ShoppingCart,
   Store,
   Users,
   Wallet,
@@ -23,46 +27,74 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { WhatsAppIcon } from "@/components/icons/whatsapp";
+import { punyaBarang, punyaJasa, type JenisUsaha } from "@/lib/usaha";
 import { cn } from "@/lib/utils";
 import { keluar } from "@/server/actions/auth";
 
-const NAV: { judul: string; item: { href: string; label: string; icon: typeof Home }[] }[] = [
-  {
-    judul: "Pencatatan",
-    item: [
-      { href: "/kasir", label: "Penjualan (POS)", icon: ReceiptText },
+type ItemNavData = { href: string; label: string; icon: typeof Home };
+type Grup = { judul: string; item: ItemNavData[] };
+
+/**
+ * Menu disusun ulang menurut jenis usaha, bukan disembunyikan dengan CSS —
+ * pemilik salon tidak perlu tahu bahwa "Produksi" pernah ada.
+ */
+function susunNav(jenis: JenisUsaha): Grup[] {
+  const barang = punyaBarang(jenis);
+  const jasa = punyaJasa(jenis);
+
+  const pencatatan: ItemNavData[] = [];
+  // POS hanya berarti kalau ada barang untuk dijual di tempat. Usaha jasa
+  // murni menutup semua penjualannya lewat papan pesanan.
+  if (barang) {
+    pencatatan.push({ href: "/kasir", label: "Penjualan (POS)", icon: ReceiptText });
+  }
+  if (jasa) {
+    pencatatan.push({ href: "/pesanan", label: "Pesanan Jasa", icon: ClipboardList });
+  }
+  if (barang) {
+    pencatatan.push(
       { href: "/produksi", label: "Produksi", icon: ChefHat },
-      { href: "/bahan", label: "Bahan Baku", icon: Wheat },
-      { href: "/beban", label: "Beban & Tagihan", icon: Wallet },
-    ],
-  },
-  {
-    judul: "Data Usaha",
-    item: [
-      { href: "/produk", label: "Produk & Stok", icon: Package },
-      { href: "/pelanggan", label: "Pelanggan", icon: Users },
-      { href: "/kasbon", label: "Utang (Kasbon)", icon: WalletCards },
-    ],
-  },
-  {
-    judul: "Analisa",
-    item: [
-      { href: "/laporan", label: "Laporan", icon: FileText },
-      { href: "/rekonsiliasi", label: "Kas & Rekonsiliasi", icon: PiggyBank },
-    ],
-  },
-  {
-    judul: "Pengaturan",
-    item: [
-      { href: "/outlet", label: "Outlet & Staf", icon: Store },
-      { href: "/pengingat", label: "Pengingat", icon: Clock },
-    ],
-  },
-];
+      { href: "/pembelian", label: "Pembelian Stok", icon: ShoppingCart },
+      { href: "/persediaan", label: "Persediaan", icon: Wheat },
+    );
+  }
+  pencatatan.push({ href: "/beban", label: "Beban & Tagihan", icon: Wallet });
+
+  const dataUsaha: ItemNavData[] = [];
+  if (jasa) dataUsaha.push({ href: "/layanan", label: "Layanan", icon: Scissors });
+  if (barang) {
+    dataUsaha.push({ href: "/produk", label: "Produk & Stok", icon: Package });
+  }
+  dataUsaha.push(
+    { href: "/pelanggan", label: "Pelanggan", icon: Users },
+    { href: "/kasbon", label: "Utang (Kasbon)", icon: WalletCards },
+  );
+
+  return [
+    { judul: "Pencatatan", item: pencatatan },
+    { judul: "Data Usaha", item: dataUsaha },
+    {
+      judul: "Analisa",
+      item: [
+        { href: "/laporan", label: "Laporan", icon: FileText },
+        { href: "/kas", label: "Kas & Bank", icon: Landmark },
+        { href: "/rekonsiliasi", label: "Rekonsiliasi Harian", icon: PiggyBank },
+      ],
+    },
+    {
+      judul: "Pengaturan",
+      item: [
+        { href: "/outlet", label: "Outlet & Staf", icon: Store },
+        { href: "/pengingat", label: "Pengingat", icon: Clock },
+      ],
+    },
+  ];
+}
 
 type Props = {
   namaPemilik: string;
   peran: string;
+  jenisUsaha: JenisUsaha;
   paket: string;
   berlakuSampai: string;
   waBantuan: string | null;
@@ -73,6 +105,7 @@ type Props = {
 export function Sidebar({
   namaPemilik,
   peran,
+  jenisUsaha,
   paket,
   berlakuSampai,
   waBantuan,
@@ -80,6 +113,7 @@ export function Sidebar({
   onClose,
 }: Props) {
   const pathname = usePathname();
+  const nav = susunNav(jenisUsaha);
 
   return (
     <>
@@ -156,7 +190,7 @@ export function Sidebar({
             </li>
           </ul>
 
-          {NAV.map((grup) => (
+          {nav.map((grup) => (
             <div key={grup.judul} className="mt-4">
               <p className="px-3.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">
                 {grup.judul}
@@ -168,7 +202,7 @@ export function Sidebar({
                       href={href}
                       label={label}
                       icon={icon}
-                      aktif={pathname.startsWith(href)}
+                      aktif={pathname === href || pathname.startsWith(`${href}/`)}
                       onClose={onClose}
                     />
                   </li>

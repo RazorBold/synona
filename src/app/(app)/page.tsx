@@ -10,6 +10,7 @@ import {
 import { PaymentDonut, SalesChart } from "@/components/dashboard/charts-lazy";
 import { DebtPanel } from "@/components/dashboard/debt-panel";
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import { AntreanCard } from "@/components/dashboard/antrean-card";
 import { LowStockCard } from "@/components/dashboard/low-stock-card";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RadarPanel } from "@/components/dashboard/radar-panel";
@@ -20,6 +21,7 @@ import {
   salamWaktu,
 } from "@/lib/date";
 import { formatRingkas, formatRupiah, hitungTren } from "@/lib/money";
+import { punyaBarang } from "@/lib/usaha";
 import { getDataDashboard } from "@/server/queries/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -138,14 +140,26 @@ export default async function DashboardPage({
 
         {/* Stok, pembayaran, aksi cepat */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <LowStockCard daftar={d.stok.daftar} total={d.stok.total} />
+          {punyaBarang(d.outlet.jenisUsaha) ? (
+            <LowStockCard daftar={d.stok.daftar} total={d.stok.total} />
+          ) : (
+            <AntreanCard antrean={d.antrean} />
+          )}
           <PaymentDonut data={pembayaran} />
           <div className="md:col-span-2 xl:col-span-1">
-            <QuickActions />
+            <QuickActions jenisUsaha={d.outlet.jenisUsaha} />
           </div>
         </div>
 
-        <TipsBanner teks="Gunakan POS (Penjualan) untuk mencatat transaksi dengan cepat dan akurat." />
+        {punyaBarang(d.outlet.jenisUsaha) ? (
+          <TipsBanner teks="Gunakan POS (Penjualan) untuk mencatat transaksi dengan cepat dan akurat." />
+        ) : (
+          <TipsBanner
+            teks="Catat pekerjaan lewat Pesanan Jasa — antreannya terpantau sampai barang diserahkan."
+            href="/pesanan"
+            aksi="Buka Papan"
+          />
+        )}
       </div>
     </div>
   );

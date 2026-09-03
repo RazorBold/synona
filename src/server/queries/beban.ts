@@ -18,6 +18,8 @@ export type BarisBeban = {
   nama: string;
   jumlah: number;
   metode: string;
+  akunKasId: string | null;
+  namaAkun: string | null;
   berulang: number;
   tanggal: string;
   waktu: number;
@@ -31,13 +33,15 @@ export async function getDaftarBeban(
   sampai: string,
 ): Promise<BarisBeban[]> {
   return db.all<BarisBeban>(sql`
-    SELECT id, category AS kategori, name AS nama, amount AS jumlah,
-           method AS metode, berulang, business_date AS tanggal,
-           occurred_at AS waktu, note AS catatan
-      FROM expenses
-     WHERE outlet_id = ${outletId}
-       AND business_date BETWEEN ${dari} AND ${sampai}
-     ORDER BY occurred_at DESC
+    SELECT e.id, e.category AS kategori, e.name AS nama, e.amount AS jumlah,
+           e.method AS metode, e.cash_account_id AS akunKasId,
+           a.name AS namaAkun, e.berulang, e.business_date AS tanggal,
+           e.occurred_at AS waktu, e.note AS catatan
+      FROM expenses e
+      LEFT JOIN cash_accounts a ON a.id = e.cash_account_id
+     WHERE e.outlet_id = ${outletId}
+       AND e.business_date BETWEEN ${dari} AND ${sampai}
+     ORDER BY e.occurred_at DESC
   `);
 }
 

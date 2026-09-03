@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 
 import { WhatsAppIcon } from "@/components/icons/whatsapp";
 import { BayarDialog } from "@/components/kasbon/bayar-dialog";
+import type { AkunKas } from "@/server/queries/kas";
 import { UtangDialog } from "@/components/kasbon/utang-dialog";
 import { AvatarInisial } from "@/components/ui/avatar-inisial";
 import { Chip } from "@/components/ui/chip";
@@ -43,12 +44,14 @@ export function KasbonClient({
   utang,
   statistik,
   pelanggan,
+  akun,
   hariIni,
   namaToko,
 }: {
   utang: BarisUtangKasbon[];
   statistik: Statistik;
   pelanggan: { id: string; nama: string }[];
+  akun: AkunKas[];
   hariIni: string;
   namaToko: string;
 }) {
@@ -313,6 +316,7 @@ export function KasbonClient({
       </section>
 
       <BayarDialog
+        akun={akun}
         open={bayarOpen}
         onOpenChange={setBayarOpen}
         utang={terpilih}

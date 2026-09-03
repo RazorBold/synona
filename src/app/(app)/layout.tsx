@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { BannerSandiDefault } from "@/components/auth/banner-sandi-default";
 import { BannerMasaPaket } from "@/components/layout/banner-masa-paket";
 import { AppShell } from "@/components/layout/app-shell";
+import { SetupJenisUsaha } from "@/components/onboarding/setup-jenis-usaha";
 import { RUTE_GANTI_SANDI, RUTE_SESI_BERAKHIR } from "@/lib/auth-const";
 import { akunSesi, sesiSaatIni } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
@@ -30,6 +31,18 @@ export default async function AppLayout({
   if (akun.harusGantiSandi) redirect(RUTE_GANTI_SANDI);
 
   const outlet = await getOutletAktif();
+
+  /**
+   * Jenis usaha normalnya sudah dipilih di halaman masuk. Yang tersisa di
+   * sini adalah sesi yang masih hidup saat outletnya diganti dari CLI
+   * (`npm run data:kosongkan`) — orangnya tidak pernah lewat halaman masuk
+   * lagi. Layarnya dirender di tempat, bukan dialihkan: tidak ada rute lain
+   * yang perlu dibuat, dan tidak ada kemungkinan pantulan tak berujung.
+   */
+  if (!outlet.jenisUsaha) {
+    return <SetupJenisUsaha namaOutlet={outlet.name} namaPemilik={akun.nama} />;
+  }
+
   const pengingat = await getStatistikPengingat(outlet.id);
 
   /**
@@ -54,6 +67,7 @@ export default async function AppLayout({
       namaPemilik={akun.nama}
       peran={akun.peran === "pemilik" ? "Pemilik" : "Kasir"}
       namaOutlet={outlet.name}
+      jenisUsaha={outlet.jenisUsaha}
       paket={paket}
       berlakuSampai={berlakuSampai}
       jumlahNotifikasi={pengingat.menunggu}

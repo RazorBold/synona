@@ -21,6 +21,7 @@ import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { hapusBeban } from "@/server/actions/beban";
 import type { BarisBeban, KategoriBeban } from "@/server/queries/beban";
+import type { AkunKas } from "@/server/queries/kas";
 import { aman } from "@/lib/aksi";
 
 type Statistik = {
@@ -47,11 +48,13 @@ const PERIODE = [
 export function BebanClient({
   beban,
   statistik,
+  akun,
   periode,
   labelPeriode,
 }: {
   beban: BarisBeban[];
   statistik: Statistik;
+  akun: AkunKas[];
   periode: string;
   labelPeriode: string;
 }) {
@@ -243,6 +246,7 @@ export function BebanClient({
         open={formOpen}
         onOpenChange={setFormOpen}
         beban={terpilih}
+        akun={akun}
       />
     </div>
   );

@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 import { formatWaktuSingkat } from "@/lib/date";
 import { formatJumlahBahan } from "@/lib/satuan";
 import { cn } from "@/lib/utils";
-import { ambilRiwayatBahan, sesuaikanStokBahan } from "@/server/actions/bahan";
-import type { BarisBahan, PergerakanBahan } from "@/server/queries/bahan";
+import { ambilRiwayatBahan, sesuaikanStokBahan } from "@/server/actions/persediaan";
+import type { BarisBahan, PergerakanBahan } from "@/server/queries/persediaan";
 import { aman } from "@/lib/aksi";
 
 const MODE = [

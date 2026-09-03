@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import type { JenisUsaha } from "@/lib/usaha";
+
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 
@@ -9,6 +11,7 @@ type Props = {
   namaPemilik: string;
   peran: string;
   namaOutlet: string;
+  jenisUsaha: JenisUsaha;
   paket: string;
   berlakuSampai: string;
   jumlahNotifikasi: number;
@@ -20,6 +23,7 @@ export function AppShell({
   namaPemilik,
   peran,
   namaOutlet,
+  jenisUsaha,
   paket,
   berlakuSampai,
   jumlahNotifikasi,
@@ -40,6 +44,7 @@ export function AppShell({
       <Sidebar
         namaPemilik={namaPemilik}
         peran={peran}
+        jenisUsaha={jenisUsaha}
         paket={paket}
         berlakuSampai={berlakuSampai}
         waBantuan={waBantuan}

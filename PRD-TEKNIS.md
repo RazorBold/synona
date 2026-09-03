@@ -578,7 +578,7 @@ Tiga mesin hitung (Tahap 2): **Inventory**, **HPP**, **Keuangan**. Analisa keseh
 
 Flowchart menyebut "semua masuk ke BUKU (Ledger) — sumber kebenaran tunggal". Godaannya adalah membuat satu tabel `cash_entries` yang menampung semua pergerakan uang.
 
-**Keputusan: tidak.** Buku kas dibuat sebagai **query gabungan (view)** atas tabel kejadian yang sudah ada — `transactions`, `debt_payments`, `expenses`, `purchases`, `payable_payments`.
+**Keputusan: tidak.** Buku kas dibuat sebagai **query gabungan (view)** atas tabel kejadian yang sudah ada — `transactions`, `debt_payments`, `expenses`, `purchases`, `payable_payments`, `cash_transfers`.
 
 **Alasannya:**
 - Satu kejadian = satu baris di satu tabel. Kalau ada tabel ledger terpisah, setiap penulisan harus menulis dua tempat, dan **satu bug saja membuat buku kas tidak cocok dengan penjualan** — kelas bug yang paling mahal untuk aplikasi keuangan.
@@ -586,6 +586,8 @@ Flowchart menyebut "semua masuk ke BUKU (Ledger) — sumber kebenaran tunggal". 
 - Sifat *append-only* tetap terjaga karena baris kejadian tidak pernah dihapus (pembatalan memakai status `void`, bukan DELETE).
 
 Konsekuensi: laporan arus kas berupa `UNION ALL` beberapa sumber. Untuk skala UMKM ini murah; kalau kelak berat, tinggal dibuatkan tabel ringkasan harian.
+
+Keputusan ini tetap berlaku setelah kas dipisah per akun (§16.10): yang ditambahkan hanya kolom `cash_account_id` di tiap tabel kejadian, bukan tabel ledger baru.
 
 ### 16.3 ADR-003 — Presisi harga bahan baku
 
@@ -596,7 +598,7 @@ Biji kopi Rp 150.000/kg = **Rp 150 per gram**; tapi bahan seperti perasa bisa Rp
 ### 16.4 Tabel baru
 
 **`materials`** — bahan baku
-`outlet_id` · `name` · `unit` (`g`|`ml`|`pcs`) · `stock` INT (satuan terkecil) · `cost_per_unit_milli` INT (rata-rata bergerak) · `low_stock_threshold` · `is_active`
+`outlet_id` · `name` · `jenis` (`baku`|`setengah_jadi`|`jadi`) · `unit` (`g`|`ml`|`pcs`) · `stock` INT (satuan terkecil) · `cost_per_unit_milli` INT (rata-rata bergerak) · `low_stock_threshold` · `is_active`
 
 **`material_movements`** — buku besar bahan baku (append-only)
 `outlet_id` · `material_id` · `type` (`purchase`|`production`|`adjustment`|`waste`) · `qty_change` · `stock_after` · `cost_per_unit_milli` (harga saat itu) · `ref_id` · `note` · `created_at`
@@ -607,9 +609,9 @@ Biji kopi Rp 150.000/kg = **Rp 150 per gram**; tapi bahan seperti perasa bisa Rp
 **`productions`** — hasil olah
 `outlet_id` · `product_id` · `qty` · `hpp_per_unit` (snapshot) · `total_cost` · `staff_id` · `note` · `occurred_at` · `business_date`
 
-**`purchases`** / **`purchase_items`** — pembelian bahan baku
-`supplier_name` · `total` · `paid_amount` · `remaining` · `status` (`paid`|`partial`|`debt`) · `due_date` · `occurred_at` · `business_date`
-item: `material_id` · `qty` · `unit_cost_milli` · `line_total`
+**`purchases`** / **`purchase_items`** — pembelian stok (lihat §16.11)
+`supplier_name` · `total` · `paid_amount` · `remaining` · `status` (`paid`|`partial`|`debt`) · `due_date` · `cash_account_id` · `occurred_at` · `business_date`
+item: `material_id` **atau** `product_id` · `qty` · `unit_cost_milli` · `line_total`
 
 **`payable_payments`** — pelunasan hutang ke supplier
 `purchase_id` · `amount` · `method` · `paid_at` · `note`
@@ -631,6 +633,8 @@ laba_bersih      = laba_kotor − Σ(beban periode)           (BARU)
 beban_harian     = beban_tidak_rutin_hari_itu + (beban_rutin_bulan / jumlah_hari_bulan)
 arus_kas_masuk   = penjualan tunai/QRIS/transfer + cicilan piutang
 arus_kas_keluar  = pembelian dibayar + beban + pelunasan hutang supplier
+saldo_akun       = opening_balance + Σ(mutasi akun itu s/d tanggal)
+                   mutasi transfer antar akun saling meniadakan di total
 BEP_harian       = beban_tetap_bulanan / 30 / margin_kotor_rata2
 perputaran_stok  = HPP terjual periode / nilai stok rata-rata
 hari_stok_sisa   = stok_sekarang / rata2_pemakaian_harian
@@ -650,6 +654,67 @@ stok_mati        = produk/bahan tanpa pergerakan > 30 hari
 | G | Radar 6 Pertanyaan → Aksi (dashboard) | ✅ Selesai |
 | H | Laporan & rekonsiliasi | ✅ Selesai |
 | I | Outlet & Staf (gating paket) + Pengingat | ✅ Selesai |
+| J | Kas & Bank per akun + mutasi keluar-masuk (§16.10) | ✅ Selesai |
+| K | Persediaan berjenis + Pembelian sebagai menu sendiri (§16.11) | ✅ Selesai |
+| L | Jenis usaha (dagang/jasa/campuran) + Layanan & Pesanan Jasa (§16.12) | ✅ Selesai |
 
 Urutannya sengaja: **B lebih dulu** karena beban adalah satu-satunya yang membuat kata "untung" jadi jujur, dan biayanya paling murah. C–E membangun jembatan inventory ↔ keuangan. F–G baru bisa dihitung setelah semuanya ada.
 
+### 16.10 ADR-004 — Kas & bank sebagai akun, bukan enum metode bayar
+
+Semula "di mana uangnya" hanya tersirat dari kolom `method` (`cash`|`qris`|`transfer`|`other`). Itu cukup untuk memilah cara bayar, tapi tidak bisa menjawab pertanyaan yang sebenarnya ditanyakan pemilik: *saldo BCA saya berapa, dan saldo BRI berapa?* Satu enum tidak bisa menampung dua rekening bank.
+
+**Keputusan:** tambah tabel `cash_accounts`, lalu tiap tabel kejadian menunjuk ke sana lewat `cash_account_id`.
+
+- Kolom `method` **tetap dipertahankan** dan tetap diisi (diturunkan dari jenis akun). Rekonsiliasi harian dan laporan lama membacanya; membuangnya berarti menulis ulang fitur yang sudah jalan tanpa alasan.
+- `metode_default` di akun menjawab "uang QRIS masuk ke mana" untuk kasir yang tidak sempat memilih akun. Satu metode maksimal satu akun default per outlet (unique index parsial).
+- Baris lama di-backfill saat migrasi, dan query tetap punya fallback ke akun default metodenya — supaya tidak ada mutasi yatim yang membuat saldo per akun meleset.
+- `cash_transfers` mencatat setor/tarik tunai antar akun sendiri. Ini bukan pendapatan dan bukan beban; tanpa mencatatnya, saldo laci dan saldo bank sama-sama salah walau total uangnya benar.
+
+**`cash_accounts`**
+`outlet_id` · `name` · `type` (`kas`|`bank`|`ewallet`) · `bank_name` · `account_number` · `opening_balance` · `metode_default` (`cash`|`qris`|`transfer`, nullable) · `sort_order` · `is_active`
+
+**`cash_transfers`**
+`outlet_id` · `from_account_id` · `to_account_id` · `amount` · `note` · `occurred_at` · `business_date` · `recorded_by`
+
+### 16.11 Persediaan berjenis & pembelian sebagai menu sendiri
+
+**Menu "Bahan Baku" menjadi "Persediaan"** (`/persediaan`; `/bahan` dialihkan supaya PWA terpasang dan tautan lama tidak berujung 404). `materials` mendapat kolom `jenis` (`baku`|`setengah_jadi`|`jadi`): yang masih harus diolah, hasil olahan yang dipakai lagi, dan barang siap pakai yang dibeli utuh dari supplier.
+
+**Pembelian dipindah ke menunya sendiri** (`/pembelian`), keluar dari halaman persediaan dan tetap **terpisah dari Beban** — uang yang dipakai membeli stok belum jadi biaya, ia berubah jadi persediaan dan baru menjadi HPP saat barangnya terjual. Mencatatnya sebagai beban membuat laba bulan belanja terlihat anjlok lalu bulan berikutnya terlihat melonjak.
+
+Satu nota kini boleh memuat bahan **dan** produk siap jual: `purchase_items` mendapat `product_id` di samping `material_id`, tepat satu terisi per baris. Baris produk menambah `products.stock` + `stock_movements`, dan memperbarui `products.cost` secara rata-rata bergerak **hanya** bila `hpp_mode = 'manual'` — produk ber-resep HPP-nya dihitung dari bahannya, jadi tidak boleh ditimpa harga beli.
+
+### 16.12 ADR-005 — Usaha jasa: pesanan sebagai alur kerja, bukan pembukuan kedua
+
+Synona semula hanya mengenal satu bentuk usaha: jual barang, stok berkurang, selesai di kasir. Usaha jasa berbeda di dua hal mendasar — tidak ada stok yang berkurang, dan pekerjaannya tidak selesai di detik pembayaran. Laundry dititipkan hari ini dan diambil lusa; motor ditinggal pagi, dibayar sore.
+
+**Keputusan 1: jenis usaha dipilih di awal, bukan disimpulkan.** `outlets.jenis_usaha` (`dagang`|`jasa`|`campuran`) menentukan menu yang tampil. Kolomnya **nullable tanpa default**, supaya "belum memilih" bisa dibedakan dari "sudah memilih dagang" — tanpa itu, pertanyaannya tidak akan pernah muncul untuk pemasangan baru. Outlet yang sudah ada di-backfill ke `dagang` saat migrasi.
+
+Pertanyaannya diajukan **di halaman masuk**, hanya selama `jenis_usaha` masih NULL, dan **pilihannya ikut terkirim bersama kredensial** lalu disimpan setelah sandinya terbukti benar. Menyediakannya sebagai server action tersendiri akan berarti ada endpoint tanpa autentikasi yang bisa menentukan pengaturan outlet orang lain — siapa pun yang bisa membuka halaman masuk bisa memanggilnya. Penyimpanannya dijaga klausa `WHERE jenis_usaha IS NULL`, jadi nilai yang sudah terisi tidak bisa ditimpa dari halaman masuk; penggantian berikutnya hanya lewat Pengaturan → Outlet.
+
+Satu kasus tersisa: `npm run data:kosongkan` mengganti outlet dari CLI sementara cookie sesi pemiliknya masih hidup, sehingga ia tidak pernah lewat halaman masuk lagi. Untuk itu `(app)/layout.tsx` **merender layar pemilihan di tempat** alih-alih mengalihkan — tidak ada rute tambahan, dan tidak ada kemungkinan pantulan tak berujung.
+
+Halaman yang tidak relevan tidak sekadar disembunyikan dari sidebar, tapi menjawab 404 (`punyaBarang()` / `punyaJasa()` di `src/lib/usaha.ts`). Menyembunyikan menu tapi membiarkan URL-nya hidup akan memunculkan layar kosong yang membingungkan begitu ada yang menekan tombol Kembali.
+
+**Keputusan 2: pesanan jasa TIDAK menyimpan uangnya sendiri.** Godaannya adalah membuat `service_orders` lengkap dengan `total`, `dibayar`, `sisa`. Itu akan melanggar ADR-002 dengan cara yang sama seperti tabel ledger: dua tempat menyimpan angka yang sama, dan satu bug membuat omzet jasa berselisih dengan omzet barang.
+
+Yang dilakukan: **satu pesanan = satu baris `transactions`**, dibuat saat pesanan diterima, lengkap dengan `transaction_items`. Sisa yang belum dibayar memakai mesin kasbon yang sudah ada (`debts` + `debt_payments`), dan **DP dicatat sebagai cicilan pertama**. Akibatnya seluruh laporan yang sudah ada — omzet, laba, arus kas per akun, rekonsiliasi, pengingat jatuh tempo — ikut benar tanpa satu baris pun diubah. `service_orders` hanya menyimpan yang memang belum punya rumah: status pengerjaan, janji selesai, ciri barang titipan, dan waktu pengambilan.
+
+**Kapan omzet diakui: saat pesanan DITERIMA**, bukan saat diambil. Di titik itu harga sudah disepakati dan barangnya sudah di tangan. Menundanya sampai pengambilan membuat pekerjaan yang menyeberang bulan hilang dari laporan bulan berjalan. Pembatalan memakai `status = 'void'` pada transaksinya, sama seperti penjualan barang.
+
+**Keputusan 3: jumlah pecahan tanpa merusak hitungan laba.** Laundry ditagih 3,5 kg, jasa dihitung 2,5 jam. `transaction_items.qty` adalah INTEGER, dan membulatkannya akan membuat laba meleset. Aturannya: untuk baris jasa **`qty` selalu 1**, `price_snapshot` berisi **total baris**, `cost_snapshot` berisi **biaya baris**, sementara jumlah sebenarnya disimpan di `qty_milli` (× 1.000, konvensi yang sama dengan ADR-003) + `unit` hanya untuk ditampilkan. Dengan begitu `(price − cost) × qty` yang dipakai semua query lama tetap menghasilkan angka yang benar.
+
+**Harga bisa ditimpa, tapi hanya kalau diizinkan.** `services.harga_bisa_diubah` menandai layanan yang harganya baru ketahuan setelah dilihat (servis, jahit model bebas). Kalau tidak ditandai, harga yang dikirim klien **diabaikan** dan diambil ulang dari database — aturan §5 yang sama dengan POS.
+
+**`services`**
+`outlet_id` · `category_id` · `name` · `emoji` · `price` (per satuan) · `cost` · `unit` (`pcs`|`kg`|`jam`|`hari`|`meter`|`m2`) · `harga_bisa_diubah` · `estimasi_jam` · `is_active`
+
+**`service_orders`**
+`outlet_id` · `transaction_id` · `order_no` · `status` (`masuk`|`dikerjakan`|`selesai`|`diambil`|`batal`) · `janji_selesai` · `selesai_pada` · `diambil_pada` · `tanda_barang` · `note` · `occurred_at` · `business_date`
+
+**Kolom baru di `transaction_items`:** `service_id` · `qty_milli` · `unit` · `petugas_staff_id`
+
+> `petugas_staff_id` diisi per baris, bukan per pesanan: satu pelanggan salon bisa dipotong satu orang dan diwarnai orang lain. Laporan "Pendapatan per Petugas" dihitung dari kolom ini.
+
+**Penyerahan ditahan selama masih ada sisa bayar.** Menyerahkan barang yang belum lunas adalah keputusan bisnis yang boleh diambil pemilik, tapi harus disengaja — bukan efek samping dari menekan tombol tahap berikutnya.

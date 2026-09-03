@@ -2,6 +2,7 @@ import { BebanClient } from "@/components/beban/beban-client";
 import { businessDate, tambahHari } from "@/lib/date";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getDaftarBeban, getStatistikBeban } from "@/server/queries/beban";
+import { getDaftarAkunKas } from "@/server/queries/kas";
 
 export const dynamic = "force-dynamic";
 
@@ -32,15 +33,17 @@ export default async function BebanPage({
         ? "7 Hari"
         : "Bulan Ini";
 
-  const [beban, statistik] = await Promise.all([
+  const [beban, statistik, akun] = await Promise.all([
     getDaftarBeban(outlet.id, dari, hariIni),
     getStatistikBeban(outlet.id, dari, hariIni),
+    getDaftarAkunKas(outlet.id),
   ]);
 
   return (
     <BebanClient
       beban={beban}
       statistik={statistik}
+      akun={akun}
       periode={periode}
       labelPeriode={labelPeriode}
     />

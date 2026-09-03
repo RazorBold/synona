@@ -9,15 +9,10 @@ import { formatWaktuSingkat, labelJatuhTempo } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ambilRiwayatCicilan, catatPembayaran } from "@/server/actions/kasbon";
+import type { AkunKas } from "@/server/queries/kas";
 import type { BarisUtangKasbon, Cicilan } from "@/server/queries/kasbon";
 import { aman } from "@/lib/aksi";
-
-const METODE: { key: "cash" | "qris" | "transfer" | "other"; label: string }[] = [
-  { key: "cash", label: "Tunai" },
-  { key: "qris", label: "QRIS" },
-  { key: "transfer", label: "Transfer" },
-  { key: "other", label: "Lainnya" },
-];
+import { metodeAkun } from "@/lib/kas";
 
 const TONE_TEMPO = {
   danger: "text-danger",
@@ -29,17 +24,17 @@ export function BayarDialog({
   open,
   onOpenChange,
   utang,
+  akun,
   hariIni,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   utang: BarisUtangKasbon | null;
+  akun: AkunKas[];
   hariIni: string;
 }) {
   const [jumlah, setJumlah] = useState(0);
-  const [metode, setMetode] = useState<"cash" | "qris" | "transfer" | "other">(
-    "cash",
-  );
+  const [akunKasId, setAkunKasId] = useState("");
   const [catatan, setCatatan] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,14 +43,14 @@ export function BayarDialog({
   useEffect(() => {
     if (!open || !utang) return;
     setJumlah(utang.sisa);
-    setMetode("cash");
+    setAkunKasId(akun[0]?.id ?? "");
     setCatatan("");
     setError(null);
     setCicilan([]);
     void ambilRiwayatCicilan(utang.id)
       .then(setCicilan)
       .catch(() => setCicilan([]));
-  }, [open, utang]);
+  }, [open, utang, akun]);
 
   if (!utang) return null;
 
@@ -81,7 +76,8 @@ export function BayarDialog({
     const hasil = await aman(catatPembayaran({
       debtId: utang.id,
       jumlah,
-      metode,
+      metode: metodeAkun(akun.find((a) => a.id === akunKasId)?.jenis),
+      akunKasId: akunKasId || null,
       catatan: catatan.trim() || null,
     }));
 
@@ -203,21 +199,21 @@ export function BayarDialog({
 
             <div className="mt-4">
               <label className="text-sm font-semibold text-ink">
-                Dibayar lewat
+                Uangnya masuk ke
               </label>
-              <div className="mt-2 grid grid-cols-4 gap-2">
-                {METODE.map((m) => (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {akun.map((a) => (
                   <button
-                    key={m.key}
-                    onClick={() => setMetode(m.key)}
+                    key={a.id}
+                    onClick={() => setAkunKasId(a.id)}
                     className={cn(
-                      "rounded-xl border py-2.5 text-[13px] font-semibold transition-colors",
-                      metode === m.key
+                      "truncate rounded-xl border px-3 py-2.5 text-[13px] font-semibold transition-colors",
+                      akunKasId === a.id
                         ? "border-brand-300 bg-brand-50 text-brand-600"
                         : "border-line bg-white text-ink-soft hover:bg-canvas",
                     )}
                   >
-                    {m.label}
+                    {a.nama}
                   </button>
                 ))}
               </div>

@@ -1,12 +1,13 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { pengguna } from "@/db/schema";
+import { outlets, pengguna } from "@/db/schema";
 import { RUTE_GANTI_SANDI, RUTE_MASUK } from "@/lib/auth-const";
+import type { JenisUsaha } from "@/lib/usaha";
 import {
   bolehCobaLogin,
   buatSalt,
@@ -29,6 +30,14 @@ const MasukInput = z.object({
   namaPengguna: z.string().trim().min(1, "Nama pengguna wajib diisi").max(64),
   sandi: z.string().min(1, "Sandi wajib diisi").max(200),
   lanjut: z.string().max(300).nullable().default(null),
+  /**
+   * Hanya terisi pada pemasangan baru: halaman masuk menampilkan pilihan
+   * jenis usaha selama outletnya belum punya. Ikut dikirim bersama
+   * kredensial supaya penyimpanannya terjadi SETELAH sandinya terbukti
+   * benar — kalau disediakan sebagai aksi tersendiri, siapa pun yang bisa
+   * membuka halaman masuk bisa menentukan jenis usaha orang lain.
+   */
+  jenisUsaha: z.enum(["dagang", "jasa", "campuran"]).nullable().default(null),
 });
 
 /**
@@ -52,7 +61,7 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: parsed.error.issues[0].message };
   }
 
-  const { sandi, lanjut } = parsed.data;
+  const { sandi, lanjut, jenisUsaha } = parsed.data;
   const namaPengguna = parsed.data.namaPengguna.toLowerCase();
 
   if (!bolehCobaLogin(namaPengguna)) {
@@ -80,7 +89,34 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
     peran: akun.peran,
   });
 
+  if (jenisUsaha) simpanJenisUsahaAwal(jenisUsaha, akun.peran);
+
   redirect(tujuanAman(lanjut));
+}
+
+/**
+ * Menetapkan jenis usaha SEKALI, hanya selama outletnya masih kosong.
+ *
+ * Klausa `jenis_usaha IS NULL` itu penjaganya: setelah terisi, nilai dari
+ * halaman masuk tidak bisa lagi menimpanya — penggantian berikutnya hanya
+ * lewat Pengaturan → Outlet oleh pemilik yang sudah masuk.
+ */
+function simpanJenisUsahaAwal(jenis: JenisUsaha, peran: string): void {
+  if (peran !== "pemilik") return;
+  db.update(outlets)
+    .set({ jenisUsaha: jenis })
+    .where(isNull(outlets.jenisUsaha))
+    .run();
+}
+
+/** Apakah pemasangan ini belum pernah memilih jenis usaha. */
+export async function perluPilihJenisUsaha(): Promise<boolean> {
+  const row = db
+    .select({ jenisUsaha: outlets.jenisUsaha })
+    .from(outlets)
+    .limit(1)
+    .get();
+  return Boolean(row) && row!.jenisUsaha === null;
 }
 
 export async function keluar(): Promise<never> {

@@ -28,6 +28,7 @@ export default async function OutletPage() {
     <OutletClient
       outlet={outlet}
       staf={staf}
+      jenisUsaha={aktif.jenisUsaha}
       pemilik={{
         id: pemilik.id,
         nama: pemilik.nama,

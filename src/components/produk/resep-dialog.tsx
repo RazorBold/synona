@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ambilResep, simpanResep } from "@/server/actions/resep";
-import type { BarisBahan } from "@/server/queries/bahan";
+import type { BarisBahan } from "@/server/queries/persediaan";
 import type { BarisProduk } from "@/server/queries/produk";
 import { aman } from "@/lib/aksi";
 

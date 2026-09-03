@@ -61,6 +61,15 @@ export const outlets = sqliteTable(
     address: text("address"),
     phone: text("phone"),
     timezone: text("timezone").notNull().default("Asia/Jakarta"),
+    /**
+     * Menentukan menu mana yang masuk akal untuk usaha ini.
+     *
+     * NULL = pemilik belum memilih; halaman masuk menampilkan pilihannya.
+     * Sengaja tidak diberi default supaya "belum memilih" bisa dibedakan dari
+     * "sudah memilih dagang" — tanpa itu, penyiapan awal tidak pernah muncul
+     * untuk pemasangan baru.
+     */
+    jenisUsaha: text("jenis_usaha", { enum: ["dagang", "jasa", "campuran"] }),
     isActive: integer("is_active").notNull().default(1),
     ...timestamps,
   },
@@ -191,6 +200,9 @@ export const transactions = sqliteTable(
     }).notNull(),
     paidAmount: integer("paid_amount").notNull().default(0),
     changeAmount: integer("change_amount").notNull().default(0),
+    cashAccountId: text("cash_account_id").references(() => cashAccounts.id, {
+      onDelete: "set null",
+    }),
     status: text("status", { enum: ["paid", "debt", "void"] })
       .notNull()
       .default("paid"),
@@ -222,15 +234,36 @@ export const transactionItems = sqliteTable(
     productId: text("product_id").references(() => products.id, {
       onDelete: "set null",
     }),
+    /**
+     * Baris jasa memakai tabel yang sama dengan baris barang supaya SEMUA
+     * hitungan omzet dan laba yang sudah ada tetap benar tanpa diubah.
+     *
+     * Aturannya: untuk baris jasa `qty` selalu 1, `price_snapshot` berisi
+     * total baris itu, dan `cost_snapshot` berisi biaya baris itu. Jumlah
+     * sebenarnya (3,5 kg; 2 jam) disimpan di `qty_milli` + `unit` hanya untuk
+     * ditampilkan. Tanpa aturan ini, jumlah pecahan akan membulatkan `qty`
+     * dan membuat laba meleset.
+     */
+    serviceId: text("service_id").references(() => services.id, {
+      onDelete: "set null",
+    }),
     nameSnapshot: text("name_snapshot").notNull(),
     priceSnapshot: integer("price_snapshot").notNull(),
     costSnapshot: integer("cost_snapshot").notNull().default(0),
     qty: integer("qty").notNull(),
+    /** Jumlah × 1.000 — menampung pecahan seperti 3,5 kg tanpa float. */
+    qtyMilli: integer("qty_milli"),
+    unit: text("unit"),
+    /** Siapa yang mengerjakan; dasar laporan pendapatan per petugas. */
+    petugasStaffId: text("petugas_staff_id").references(() => staff.id, {
+      onDelete: "set null",
+    }),
     lineTotal: integer("line_total").notNull(),
   },
   (t) => [
     index("idx_items_tx").on(t.transactionId),
     index("idx_items_product").on(t.productId),
+    index("idx_items_petugas").on(t.petugasStaffId),
   ],
 );
 
@@ -274,11 +307,85 @@ export const debtPayments = sqliteTable(
     method: text("method", { enum: ["cash", "qris", "transfer", "other"] })
       .notNull()
       .default("cash"),
+    cashAccountId: text("cash_account_id").references(() => cashAccounts.id, {
+      onDelete: "set null",
+    }),
     paidAt: integer("paid_at").notNull(),
     note: text("note"),
     recordedBy: text("recorded_by").references(() => users.id),
   },
   (t) => [index("idx_debt_payments_debt").on(t.debtId)],
+);
+
+/* ------------------------------------------------------- akun kas */
+
+/**
+ * Kas & bank. Pemilik warung hampir selalu punya lebih dari satu "dompet":
+ * uang laci, rekening BCA, saldo QRIS yang cair H+1. Tanpa memisahkannya,
+ * "saldo kas" di laporan adalah angka yang tidak pernah cocok dengan
+ * kenyataan mana pun.
+ *
+ * `metodeDefault` menjawab "uang QRIS masuk ke akun mana?" untuk pencatatan
+ * cepat di kasir yang tidak sempat memilih akun. Satu metode maksimal satu
+ * akun default per outlet.
+ */
+export const cashAccounts = sqliteTable(
+  "cash_accounts",
+  {
+    id: id(),
+    outletId: text("outlet_id")
+      .notNull()
+      .references(() => outlets.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    type: text("type", { enum: ["kas", "bank", "ewallet"] })
+      .notNull()
+      .default("kas"),
+    bankName: text("bank_name"),
+    accountNumber: text("account_number"),
+    /** Saldo sebelum aplikasi dipakai. Mutasi tidak menyentuh angka ini. */
+    openingBalance: integer("opening_balance").notNull().default(0),
+    metodeDefault: text("metode_default", {
+      enum: ["cash", "qris", "transfer"],
+    }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: integer("is_active").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    index("idx_cash_accounts_outlet").on(t.outletId, t.isActive),
+    uniqueIndex("uq_cash_accounts_metode")
+      .on(t.outletId, t.metodeDefault)
+      .where(sql`metode_default is not null`),
+  ],
+);
+
+/**
+ * Perpindahan uang antar akun sendiri (setor tunai ke bank, tarik tunai).
+ *
+ * Ini bukan pendapatan dan bukan beban — kalau tidak dicatat, saldo laci
+ * dan saldo bank sama-sama salah walau total uangnya benar.
+ */
+export const cashTransfers = sqliteTable(
+  "cash_transfers",
+  {
+    id: id(),
+    outletId: text("outlet_id")
+      .notNull()
+      .references(() => outlets.id, { onDelete: "cascade" }),
+    fromAccountId: text("from_account_id")
+      .notNull()
+      .references(() => cashAccounts.id, { onDelete: "cascade" }),
+    toAccountId: text("to_account_id")
+      .notNull()
+      .references(() => cashAccounts.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    note: text("note"),
+    occurredAt: integer("occurred_at").notNull(),
+    businessDate: text("business_date").notNull(),
+    recordedBy: text("recorded_by").references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [index("idx_cash_transfers_outlet_date").on(t.outletId, t.businessDate)],
 );
 
 /* ------------------------------------------------------ stok & kas */
@@ -370,6 +477,15 @@ export const materials = sqliteTable(
       .notNull()
       .references(() => outlets.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /**
+     * Memisahkan apa yang masih harus diolah dari apa yang sudah siap.
+     * "baku" = tepung, gula. "setengah_jadi" = adonan, kaldu yang dimasak
+     * sekali lalu dipakai berhari-hari. "jadi" = barang siap pakai/jual
+     * yang dibeli utuh dari supplier (air mineral, kerupuk kemasan).
+     */
+    jenis: text("jenis", { enum: ["baku", "setengah_jadi", "jadi"] })
+      .notNull()
+      .default("baku"),
     unit: text("unit", { enum: ["g", "ml", "pcs"] })
       .notNull()
       .default("g"),
@@ -464,6 +580,9 @@ export const purchases = sqliteTable(
     method: text("method", { enum: ["cash", "qris", "transfer", "other"] })
       .notNull()
       .default("cash"),
+    cashAccountId: text("cash_account_id").references(() => cashAccounts.id, {
+      onDelete: "set null",
+    }),
     status: text("status", { enum: ["paid", "partial", "debt"] })
       .notNull()
       .default("paid"),
@@ -486,7 +605,12 @@ export const purchaseItems = sqliteTable(
     purchaseId: text("purchase_id")
       .notNull()
       .references(() => purchases.id, { onDelete: "cascade" }),
+    // Satu nota belanja bisa memuat bahan baku sekaligus produk siap jual,
+    // jadi tepat satu dari kedua kolom ini terisi per baris.
     materialId: text("material_id").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    productId: text("product_id").references(() => products.id, {
       onDelete: "set null",
     }),
     nameSnapshot: text("name_snapshot").notNull(),
@@ -508,11 +632,102 @@ export const payablePayments = sqliteTable(
     method: text("method", { enum: ["cash", "qris", "transfer", "other"] })
       .notNull()
       .default("cash"),
+    cashAccountId: text("cash_account_id").references(() => cashAccounts.id, {
+      onDelete: "set null",
+    }),
     paidAt: integer("paid_at").notNull(),
     note: text("note"),
     recordedBy: text("recorded_by").references(() => users.id),
   },
   (t) => [index("idx_payable_payments_purchase").on(t.purchaseId)],
+);
+
+/* --------------------------------------------------- jasa & layanan */
+
+/**
+ * Katalog layanan. Bedanya dengan `products`: tidak punya stok sama sekali.
+ * Yang dijual adalah pekerjaan, dan pekerjaan tidak bisa habis di rak.
+ */
+export const services = sqliteTable(
+  "services",
+  {
+    id: id(),
+    outletId: text("outlet_id")
+      .notNull()
+      .references(() => outlets.id, { onDelete: "cascade" }),
+    categoryId: text("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    emoji: text("emoji"),
+    price: integer("price").notNull(), // harga per satuan
+    /** Perkiraan biaya bahan pakai per satuan, supaya margin jasa jujur. */
+    cost: integer("cost").notNull().default(0),
+    /** Satuan penagihan: per potong, per kg cucian, per jam, per m². */
+    unit: text("unit", {
+      enum: ["pcs", "kg", "jam", "hari", "meter", "m2"],
+    })
+      .notNull()
+      .default("pcs"),
+    /**
+     * 1 = kasir boleh menimpa harganya saat menerima pesanan. Untuk servis
+     * yang harganya baru ketahuan setelah dibongkar, harga katalog hanya
+     * ancar-ancar; memaksanya tetap akan membuat nota tidak pernah cocok.
+     */
+    hargaBisaDiubah: integer("harga_bisa_diubah").notNull().default(0),
+    /** Perkiraan lama pengerjaan dalam jam, untuk menghitung janji selesai. */
+    estimasiJam: integer("estimasi_jam").notNull().default(0),
+    isActive: integer("is_active").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [index("idx_services_outlet_active").on(t.outletId, t.isActive)],
+);
+
+/**
+ * Papan antrean pekerjaan: laundry yang dititipkan, motor yang ditinggal,
+ * baju yang dijahit.
+ *
+ * Uangnya TIDAK dicatat di sini. Satu pesanan selalu punya satu baris
+ * `transactions` (dibuat saat pesanan diterima) — di situlah omzet, item, dan
+ * snapshot modalnya hidup, persis seperti penjualan barang. Sisa yang belum
+ * dibayar memakai mesin kasbon yang sudah ada (`debts` + `debt_payments`),
+ * jadi pelunasan saat pengambilan otomatis muncul di arus kas dan pengingat.
+ *
+ * Tabel ini murni menyimpan yang belum punya rumah: sampai mana pekerjaannya,
+ * kapan dijanjikan selesai, dan kapan benar-benar diambil.
+ */
+export const serviceOrders = sqliteTable(
+  "service_orders",
+  {
+    id: id(),
+    outletId: text("outlet_id")
+      .notNull()
+      .references(() => outlets.id, { onDelete: "cascade" }),
+    transactionId: text("transaction_id")
+      .notNull()
+      .references(() => transactions.id, { onDelete: "cascade" }),
+    orderNo: text("order_no").notNull(),
+    status: text("status", {
+      enum: ["masuk", "dikerjakan", "selesai", "diambil", "batal"],
+    })
+      .notNull()
+      .default("masuk"),
+    /** Janji ke pelanggan. YYYY-MM-DD waktu lokal outlet. */
+    janjiSelesai: text("janji_selesai"),
+    selesaiPada: integer("selesai_pada"),
+    diambilPada: integer("diambil_pada"),
+    /** Ciri barang titipan: "Honda Beat B 1234 XY", "2 kantong putih". */
+    tandaBarang: text("tanda_barang"),
+    note: text("note"),
+    occurredAt: integer("occurred_at").notNull(),
+    businessDate: text("business_date").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("idx_orders_outlet_status").on(t.outletId, t.status),
+    index("idx_orders_outlet_date").on(t.outletId, t.businessDate),
+    uniqueIndex("uq_orders_outlet_no").on(t.outletId, t.orderNo),
+  ],
 );
 
 /* ------------------------------------------------- beban & tagihan */
@@ -534,6 +749,9 @@ export const expenses = sqliteTable(
     method: text("method", { enum: ["cash", "qris", "transfer", "other"] })
       .notNull()
       .default("cash"),
+    cashAccountId: text("cash_account_id").references(() => cashAccounts.id, {
+      onDelete: "set null",
+    }),
     berulang: integer("berulang").notNull().default(0),
     occurredAt: integer("occurred_at").notNull(),
     businessDate: text("business_date").notNull(),
@@ -597,3 +815,7 @@ export type Customer = typeof customers.$inferSelect;
 export type Material = typeof materials.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Pengguna = typeof pengguna.$inferSelect;
+export type CashAccount = typeof cashAccounts.$inferSelect;
+export type Service = typeof services.$inferSelect;
+export type ServiceOrder = typeof serviceOrders.$inferSelect;
+export type Purchase = typeof purchases.$inferSelect;

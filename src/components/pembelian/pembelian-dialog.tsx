@@ -4,44 +4,60 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { aman } from "@/lib/aksi";
+import { metodeAkun } from "@/lib/kas";
 import { businessDate, tambahHari } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
-import { cn } from "@/lib/utils";
-import { simpanPembelian } from "@/server/actions/bahan";
-import type { BarisBahan } from "@/server/queries/bahan";
-import { aman } from "@/lib/aksi";
+import { simpanPembelian } from "@/server/actions/pembelian";
+import type { AkunKas } from "@/server/queries/kas";
+import type { ProdukBelanja } from "@/server/queries/pembelian";
+import type { BarisBahan } from "@/server/queries/persediaan";
 
-type Baris = { materialId: string; jumlah: number; total: number };
+type Baris = { jenis: "bahan" | "produk"; refId: string; jumlah: number; total: number };
 
 export function PembelianDialog({
   open,
   onOpenChange,
   bahan,
+  produk,
+  akun,
+  hariIni,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   bahan: BarisBahan[];
+  produk: ProdukBelanja[];
+  akun: AkunKas[];
+  hariIni: string;
 }) {
   const [supplier, setSupplier] = useState("");
   const [baris, setBaris] = useState<Baris[]>([]);
   const [dibayar, setDibayar] = useState(0);
-  const [metode, setMetode] = useState<"cash" | "qris" | "transfer" | "other">(
-    "cash",
-  );
+  const [akunKasId, setAkunKasId] = useState("");
+  const [tanggal, setTanggal] = useState(hariIni);
   const [jatuhTempo, setJatuhTempo] = useState(() =>
     tambahHari(businessDate(), 14),
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const barisAwal = (): Baris[] =>
+    bahan[0]
+      ? [{ jenis: "bahan", refId: bahan[0].id, jumlah: 0, total: 0 }]
+      : produk[0]
+        ? [{ jenis: "produk", refId: produk[0].id, jumlah: 0, total: 0 }]
+        : [];
+
   useEffect(() => {
     if (!open) return;
     setSupplier("");
-    setBaris(bahan[0] ? [{ materialId: bahan[0].id, jumlah: 0, total: 0 }] : []);
+    setBaris(barisAwal());
     setDibayar(0);
-    setMetode("cash");
+    setAkunKasId(akun[0]?.id ?? "");
+    setTanggal(hariIni);
     setError(null);
-  }, [open, bahan]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, bahan, produk, akun, hariIni]);
 
   const total = baris.reduce((a, b) => a + b.total, 0);
   const sisa = Math.max(0, total - dibayar);
@@ -50,28 +66,40 @@ export function PembelianDialog({
     setBaris((s) => s.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
   }
 
+  /** Satuan belanja: bahan dibeli per kg/liter, produk & bahan pcs per buah. */
+  function satuanBaris(b: Baris) {
+    if (b.jenis === "produk") {
+      return { label: produk.find((p) => p.id === b.refId)?.satuan ?? "pcs", faktor: 1 };
+    }
+    const m = bahan.find((x) => x.id === b.refId);
+    if (m?.satuan === "g") return { label: "kg", faktor: 1000 };
+    if (m?.satuan === "ml") return { label: "liter", faktor: 1000 };
+    return { label: "pcs", faktor: 1 };
+  }
+
   async function simpan() {
     setPending(true);
     setError(null);
 
-    const hasil = await aman(simpanPembelian({
-      supplier: supplier.trim() || null,
-      item: baris
-        .filter((b) => b.jumlah > 0)
-        .map((b) => {
-          const m = bahan.find((x) => x.id === b.materialId)!;
-          const faktor = m.satuan === "pcs" ? 1 : 1000;
-          return {
-            materialId: b.materialId,
-            qty: b.jumlah * faktor,
+    const hasil = await aman(
+      simpanPembelian({
+        supplier: supplier.trim() || null,
+        item: baris
+          .filter((b) => b.jumlah > 0 && b.refId)
+          .map((b) => ({
+            jenis: b.jenis,
+            refId: b.refId,
+            qty: b.jumlah * satuanBaris(b).faktor,
             total: b.total,
-          };
-        }),
-      dibayar,
-      metode,
-      jatuhTempo: sisa > 0 ? jatuhTempo : null,
-      catatan: null,
-    }));
+          })),
+        dibayar,
+        akunKasId: dibayar > 0 ? akunKasId || null : null,
+        metode: metodeAkun(akun.find((a) => a.id === akunKasId)?.jenis),
+        tanggal,
+        jatuhTempo: sisa > 0 ? jatuhTempo : null,
+        catatan: null,
+      }),
+    );
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
@@ -86,10 +114,11 @@ export function PembelianDialog({
           <div className="flex items-start justify-between border-b border-line px-6 py-5">
             <div>
               <Dialog.Title className="text-lg font-extrabold tracking-tight text-ink">
-                Beli Bahan Baku
+                Catat Pembelian Stok
               </Dialog.Title>
               <Dialog.Description className="mt-0.5 text-sm text-muted">
-                Stok bertambah dan harga rata-rata diperbarui otomatis.
+                Bukan beban — uangnya berubah jadi persediaan, dan baru jadi
+                biaya saat barangnya terjual.
               </Dialog.Description>
             </div>
             <Dialog.Close className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-canvas">
@@ -98,28 +127,40 @@ export function PembelianDialog({
           </div>
 
           <div className="thin-scroll flex-1 space-y-4 overflow-y-auto px-6 py-5">
-            <div>
-              <label className="text-sm font-semibold text-ink">
-                Supplier{" "}
-                <span className="font-normal text-muted">(opsional)</span>
-              </label>
-              <input
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                placeholder="Contoh: Toko Sembako Jaya"
-                className={inputKelas}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-sm font-semibold text-ink">
+                  Supplier{" "}
+                  <span className="font-normal text-muted">(opsional)</span>
+                </label>
+                <input
+                  value={supplier}
+                  onChange={(e) => setSupplier(e.target.value)}
+                  placeholder="Contoh: Toko Sembako Jaya"
+                  className={inputKelas}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-ink">
+                  Tanggal belanja
+                </label>
+                <input
+                  type="date"
+                  value={tanggal}
+                  onChange={(e) => setTanggal(e.target.value)}
+                  className={inputKelas}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-ink">
-                Bahan dibeli
+                Barang dibeli
               </label>
 
               {baris.map((b, i) => {
-                const m = bahan.find((x) => x.id === b.materialId);
-                const satuanBesar =
-                  m?.satuan === "g" ? "kg" : m?.satuan === "ml" ? "liter" : "pcs";
+                const satuan = satuanBaris(b);
+                const daftar = b.jenis === "bahan" ? bahan : produk;
 
                 return (
                   <div
@@ -128,11 +169,25 @@ export function PembelianDialog({
                   >
                     <div className="flex items-center gap-2">
                       <select
-                        value={b.materialId}
-                        onChange={(e) => ubah(i, { materialId: e.target.value })}
+                        value={b.jenis}
+                        onChange={(e) => {
+                          const jenis = e.target.value as "bahan" | "produk";
+                          const pertama =
+                            jenis === "bahan" ? bahan[0]?.id : produk[0]?.id;
+                          ubah(i, { jenis, refId: pertama ?? "" });
+                        }}
+                        className="h-11 w-[112px] shrink-0 rounded-xl border border-line bg-white px-2 text-sm font-medium text-ink outline-none focus:border-brand-200 focus:ring-4 focus:ring-brand-100"
+                      >
+                        <option value="bahan">Persediaan</option>
+                        <option value="produk">Produk</option>
+                      </select>
+                      <select
+                        value={b.refId}
+                        onChange={(e) => ubah(i, { refId: e.target.value })}
                         className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 text-sm font-medium text-ink outline-none focus:border-brand-200 focus:ring-4 focus:ring-brand-100"
                       >
-                        {bahan.map((x) => (
+                        {daftar.length === 0 && <option value="">— kosong —</option>}
+                        {daftar.map((x) => (
                           <option key={x.id} value={x.id}>
                             {x.nama}
                           </option>
@@ -162,13 +217,11 @@ export function PembelianDialog({
                           className="tabular h-11 w-full bg-transparent text-right text-sm font-bold text-ink outline-none"
                         />
                         <span className="text-xs font-semibold text-muted">
-                          {satuanBesar}
+                          {satuan.label}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-3">
-                        <span className="text-xs font-semibold text-muted">
-                          Rp
-                        </span>
+                        <span className="text-xs font-semibold text-muted">Rp</span>
                         <input
                           type="number"
                           min={0}
@@ -181,22 +234,25 @@ export function PembelianDialog({
                         />
                       </div>
                     </div>
+
+                    {b.jenis === "produk" &&
+                      produk.find((p) => p.id === b.refId)?.hppResep === 1 && (
+                        <p className="mt-2 text-[11px] text-muted">
+                          HPP produk ini dihitung dari resepnya, jadi harga beli
+                          hanya menambah stok — modalnya tidak ditimpa.
+                        </p>
+                      )}
                   </div>
                 );
               })}
 
               <button
-                onClick={() =>
-                  setBaris((s) => [
-                    ...s,
-                    { materialId: bahan[0]?.id ?? "", jumlah: 0, total: 0 },
-                  ])
-                }
-                disabled={bahan.length === 0}
+                onClick={() => setBaris((s) => [...s, ...barisAwal()])}
+                disabled={bahan.length === 0 && produk.length === 0}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-line py-3 text-sm font-semibold text-ink-soft transition-colors hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
               >
                 <Plus className="size-4" />
-                Tambah bahan
+                Tambah barang
               </button>
             </div>
 
@@ -233,22 +289,25 @@ export function PembelianDialog({
 
               <div>
                 <label className="text-sm font-semibold text-ink">
-                  Dibayar lewat
+                  Uangnya diambil dari
                 </label>
                 <select
-                  value={metode}
-                  onChange={(e) =>
-                    setMetode(
-                      e.target.value as "cash" | "qris" | "transfer" | "other",
-                    )
-                  }
-                  className={inputKelas}
+                  value={akunKasId}
+                  onChange={(e) => setAkunKasId(e.target.value)}
+                  disabled={dibayar <= 0}
+                  className={`${inputKelas} disabled:opacity-50`}
                 >
-                  <option value="cash">Tunai</option>
-                  <option value="qris">QRIS</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="other">Lainnya</option>
+                  {akun.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.nama}
+                    </option>
+                  ))}
                 </select>
+                {dibayar <= 0 && (
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    Belum ada uang keluar — seluruhnya jadi hutang supplier.
+                  </p>
+                )}
               </div>
             </div>
 

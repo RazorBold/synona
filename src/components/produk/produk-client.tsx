@@ -20,7 +20,7 @@ import { Chip } from "@/components/ui/chip";
 import { GambarProduk } from "@/components/ui/gambar-produk";
 import { IconButton } from "@/components/ui/icon-button";
 import { StokDialog } from "@/components/produk/stok-dialog";
-import type { BarisBahan } from "@/server/queries/bahan";
+import type { BarisBahan } from "@/server/queries/persediaan";
 import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { arsipkanProduk } from "@/server/actions/produk";

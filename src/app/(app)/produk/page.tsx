@@ -1,6 +1,9 @@
+import { notFound } from "next/navigation";
+
 import { ProdukClient } from "@/components/produk/produk-client";
+import { punyaBarang } from "@/lib/usaha";
 import { getOutletAktif } from "@/server/queries/dashboard";
-import { getDaftarBahan } from "@/server/queries/bahan";
+import { getDaftarBahan } from "@/server/queries/persediaan";
 import { getKategoriPos } from "@/server/queries/pos";
 import { getDaftarProduk, getStatistikProduk } from "@/server/queries/produk";
 
@@ -22,6 +25,12 @@ export default async function ProdukPage({
     : "semua";
 
   const outlet = await getOutletAktif();
+
+  // Usaha jasa murni tidak punya menu ini; membukanya lewat URL langsung
+
+  // pun tidak boleh membuka layar yang tidak berarti apa-apa baginya.
+
+  if (!punyaBarang(outlet.jenisUsaha)) notFound();
 
   const [produk, kategori, statistik, bahan] = await Promise.all([
     getDaftarProduk(outlet.id),

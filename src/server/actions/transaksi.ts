@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
+import { pilihAkunKas } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 const ItemInput = z.object({
@@ -27,6 +28,7 @@ const TransaksiInput = z.object({
   items: z.array(ItemInput).min(1, "Keranjang masih kosong"),
   discount: z.number().int().min(0).default(0),
   paymentMethod: z.enum(["cash", "qris", "transfer", "debt"]),
+  akunKasId: z.string().nullable().default(null),
   paidAmount: z.number().int().min(0).default(0),
   customerId: z.string().nullable().default(null),
   dueDate: z
@@ -148,6 +150,16 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           discount,
           total,
           paymentMethod: data.paymentMethod,
+          // Utang belum menggerakkan uang; akunnya baru ditentukan saat
+          // cicilannya masuk.
+          cashAccountId: isUtang
+            ? null
+            : pilihAkunKas(
+                tx,
+                outlet.id,
+                data.akunKasId,
+                data.paymentMethod as "cash" | "qris" | "transfer",
+              ),
           paidAmount: dibayar,
           changeAmount: kembalian,
           status: isUtang ? "debt" : "paid",

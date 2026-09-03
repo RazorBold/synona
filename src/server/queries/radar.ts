@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { tambahHari } from "@/lib/date";
+import { punyaBarang, type JenisUsaha } from "@/lib/usaha";
 import type { Status } from "@/server/queries/kesehatan";
 
 export type ButirRadar = {
@@ -24,7 +25,9 @@ export type ButirRadar = {
 export async function getRadar(
   outletId: string,
   hariIni: string,
+  jenisUsaha: JenisUsaha | null = "dagang",
 ): Promise<ButirRadar[]> {
+  const denganBarang = punyaBarang(jenisUsaha);
   const awal7 = tambahHari(hariIni, -6);
   const awalBulan = `${hariIni.slice(0, 7)}-01`;
   const besok = tambahHari(hariIni, 1);
@@ -107,9 +110,25 @@ export async function getRadar(
   const piutangLewat = r?.piutangLewat ?? 0;
   const hutangLewat = r?.hutangLewat ?? 0;
 
+  const a = denganBarang
+    ? null
+    : db.get<{ berjalan: number; siap: number; telat: number }>(sql`
+        SELECT COALESCE(SUM(status IN ('masuk', 'dikerjakan')), 0) AS berjalan,
+               COALESCE(SUM(status = 'selesai'), 0)                AS siap,
+               COALESCE(SUM(status IN ('masuk', 'dikerjakan')
+                            AND janji_selesai IS NOT NULL
+                            AND janji_selesai < ${hariIni}), 0)    AS telat
+          FROM service_orders
+         WHERE outlet_id = ${outletId}
+      `);
+  const antreanBerjalan = a?.berjalan ?? 0;
+  const antreanSiap = a?.siap ?? 0;
+  const antreanTelat = a?.telat ?? 0;
+
   const agenda: string[] = [];
   if (r?.piutangJumlah) agenda.push(`${r.piutangJumlah} kasbon jatuh tempo`);
-  if (kritis > 0) agenda.push(`${kritis} barang menipis`);
+  if (denganBarang && kritis > 0) agenda.push(`${kritis} barang menipis`);
+  if (antreanTelat > 0) agenda.push(`${antreanTelat} pekerjaan lewat janji`);
   if (hutangLewat > 0) agenda.push("hutang supplier jatuh tempo");
   if ((r?.bebanRutinBulan ?? 0) === 0) agenda.push("beban rutin belum dicatat");
 
@@ -126,8 +145,8 @@ export async function getRadar(
           : rata7 > 0 && omzetHariIni < rata7 * 0.7
             ? "waspada"
             : "sehat",
-      aksi: omzetHariIni === 0 ? "Buka POS" : null,
-      href: "/kasir",
+      aksi: omzetHariIni === 0 ? (denganBarang ? "Buka POS" : "Terima pesanan") : null,
+      href: denganBarang ? "/kasir" : "/pesanan",
     },
     {
       kunci: "Q2",
@@ -149,18 +168,34 @@ export async function getRadar(
       aksi: "Setor kas laci",
       href: "/rekonsiliasi",
     },
-    {
-      kunci: "Q4",
-      pertanyaan: "Stok",
-      jawaban: `${kritis} item`,
-      keterangan:
-        kritis > 0
-          ? `${r?.bahanKritis ?? 0} bahan · ${r?.produkKritis ?? 0} produk`
-          : "semua stok aman",
-      status: kritis === 0 ? "sehat" : kritis > 5 ? "bahaya" : "waspada",
-      aksi: kritis > 0 ? "Pesan ulang" : null,
-      href: (r?.bahanKritis ?? 0) > 0 ? "/bahan" : "/produk",
-    },
+    denganBarang
+      ? {
+          kunci: "Q4",
+          pertanyaan: "Stok",
+          jawaban: `${kritis} item`,
+          keterangan:
+            kritis > 0
+              ? `${r?.bahanKritis ?? 0} bahan · ${r?.produkKritis ?? 0} produk`
+              : "semua stok aman",
+          status: kritis === 0 ? "sehat" : kritis > 5 ? "bahaya" : "waspada",
+          aksi: kritis > 0 ? "Pesan ulang" : null,
+          href: (r?.bahanKritis ?? 0) > 0 ? "/persediaan" : "/produk",
+        }
+      : {
+          // Usaha jasa tidak punya rak untuk kehabisan. Yang setara
+          // gawatnya adalah pekerjaan yang lewat dari janji ke pelanggan.
+          kunci: "Q4",
+          pertanyaan: "Antrean",
+          jawaban: `${antreanBerjalan} kerjaan`,
+          keterangan:
+            antreanTelat > 0
+              ? `${antreanTelat} lewat janji · ${antreanSiap} siap diambil`
+              : `${antreanSiap} siap diambil`,
+          status:
+            antreanTelat === 0 ? "sehat" : antreanTelat > 2 ? "bahaya" : "waspada",
+          aksi: antreanTelat > 0 ? "Kabari pelanggan" : null,
+          href: "/pesanan",
+        },
     {
       kunci: "Q5",
       pertanyaan: "Tagihan",

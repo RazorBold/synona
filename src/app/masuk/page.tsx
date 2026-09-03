@@ -6,6 +6,7 @@ import { KartuAuth } from "@/components/auth/kartu-auth";
 import Link from "next/link";
 
 import { PENGGUNA_DEFAULT, RUTE_LUPA_SANDI, SANDI_DEFAULT } from "@/lib/auth-const";
+import { perluPilihJenisUsaha } from "@/server/actions/auth";
 import { akunSesi, sandiDemoMasihAktif, sesiSaatIni } from "@/server/auth";
 
 export const metadata: Metadata = { title: "Masuk — Synona" };
@@ -27,14 +28,21 @@ export default async function HalamanMasuk({
   if (s && (await akunSesi(s))) redirect("/");
 
   const { lanjut } = await searchParams;
-  const demoAktif = await sandiDemoMasihAktif();
+  const [demoAktif, perluJenisUsaha] = await Promise.all([
+    sandiDemoMasihAktif(),
+    perluPilihJenisUsaha(),
+  ]);
 
   return (
     <KartuAuth
-      judul="Masuk ke Synona"
-      keterangan="Data usaha hanya bisa dibuka setelah masuk."
+      judul={perluJenisUsaha ? "Siapkan Synona" : "Masuk ke Synona"}
+      keterangan={
+        perluJenisUsaha
+          ? "Satu pertanyaan dulu, lalu masuk seperti biasa."
+          : "Data usaha hanya bisa dibuka setelah masuk."
+      }
     >
-      <FormMasuk lanjut={lanjut ?? null} />
+      <FormMasuk lanjut={lanjut ?? null} perluJenisUsaha={perluJenisUsaha} />
 
       <Link
         href={RUTE_LUPA_SANDI}

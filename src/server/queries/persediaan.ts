@@ -3,11 +3,13 @@ import "server-only";
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
+import type { JenisBahan } from "@/lib/persediaan";
 import type { SatuanBahan } from "@/lib/satuan";
 
 export type BarisBahan = {
   id: string;
   nama: string;
+  jenis: JenisBahan;
   satuan: SatuanBahan;
   stok: number;
   hargaMilli: number;
@@ -21,6 +23,7 @@ export async function getDaftarBahan(outletId: string): Promise<BarisBahan[]> {
   return db.all<BarisBahan>(sql`
     SELECT m.id                                        AS id,
            m.name                                      AS nama,
+           m.jenis                                     AS jenis,
            m.unit                                      AS satuan,
            m.stock                                     AS stok,
            m.cost_per_unit_milli                       AS hargaMilli,
@@ -56,6 +59,15 @@ export async function getStatistikBahan(outletId: string) {
      WHERE outlet_id = ${outletId} AND status != 'paid'
   `);
 
+  const perJenis = db.all<{ jenis: string; jumlah: number; nilai: number }>(sql`
+    SELECT jenis                                        AS jenis,
+           COUNT(*)                                     AS jumlah,
+           COALESCE(CAST(ROUND(SUM(stock * cost_per_unit_milli) / 1000.0) AS INTEGER), 0) AS nilai
+      FROM materials
+     WHERE outlet_id = ${outletId} AND is_active = 1
+     GROUP BY jenis
+  `);
+
   return {
     jumlah: row?.jumlah ?? 0,
     nilai: row?.nilai ?? 0,
@@ -63,45 +75,8 @@ export async function getStatistikBahan(outletId: string) {
     habis: row?.habis ?? 0,
     hutangSupplier: hutang?.sisa ?? 0,
     jumlahHutang: hutang?.jumlah ?? 0,
+    perJenis,
   };
-}
-
-export type BarisPembelian = {
-  id: string;
-  supplier: string | null;
-  total: number;
-  dibayar: number;
-  sisa: number;
-  status: "paid" | "partial" | "debt";
-  jatuhTempo: string | null;
-  tanggal: string;
-  waktu: number;
-  jumlahItem: number;
-  rincian: string;
-};
-
-export async function getDaftarPembelian(
-  outletId: string,
-  batas = 30,
-): Promise<BarisPembelian[]> {
-  return db.all<BarisPembelian>(sql`
-    SELECT p.id           AS id,
-           p.supplier_name AS supplier,
-           p.total        AS total,
-           p.paid_amount  AS dibayar,
-           p.remaining    AS sisa,
-           p.status       AS status,
-           p.due_date     AS jatuhTempo,
-           p.business_date AS tanggal,
-           p.occurred_at  AS waktu,
-           (SELECT COUNT(*) FROM purchase_items i WHERE i.purchase_id = p.id) AS jumlahItem,
-           (SELECT GROUP_CONCAT(i.name_snapshot, ', ') FROM purchase_items i
-             WHERE i.purchase_id = p.id)                                      AS rincian
-      FROM purchases p
-     WHERE p.outlet_id = ${outletId}
-     ORDER BY p.occurred_at DESC
-     LIMIT ${batas}
-  `);
 }
 
 export type PergerakanBahan = {

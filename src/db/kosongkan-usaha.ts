@@ -21,6 +21,7 @@ const TABEL = [
   "debt_payments",
   "debts",
   "stock_movements",
+  "service_orders",
   "transaction_items",
   "transactions",
   "reminders",
@@ -34,9 +35,12 @@ const TABEL = [
   "materials",
   "expenses",
   "products",
+  "services",
   "categories",
   "customers",
   "staff",
+  "cash_transfers",
+  "cash_accounts",
   "outlets",
   "users",
 ];
@@ -107,10 +111,29 @@ sqlite.transaction(() => {
        VALUES (?, ?, ?, 'Asia/Jakarta', 1, ?, ?)`,
     )
     .run(outletId, userId, NAMA_OUTLET, sekarang, sekarang);
+
+  // Kas, bank, dan QRIS bawaan — sama seperti outlet yang dibuat dari
+  // aplikasi (src/server/kas.ts). Tanpa ini arus kas mulai tanpa akun.
+  const akun = sqlite.prepare(
+    `INSERT INTO cash_accounts (id, outlet_id, name, type, metode_default,
+                                sort_order, opening_balance, is_active,
+                                created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)`,
+  );
+  [
+    ["Kas Laci", "kas", "cash"],
+    ["Rekening Bank", "bank", "transfer"],
+    ["QRIS", "ewallet", "qris"],
+  ].forEach(([nama, jenis, metode], i) =>
+    akun.run(nanoid(), outletId, nama, jenis, metode, i, sekarang, sekarang),
+  );
 })();
 
 sqlite.close();
 
 console.log(`✓ Data demo dihapus.`);
 console.log(`✓ Outlet "${NAMA_OUTLET}" siap dipakai.`);
-console.log(`\nLangkah berikutnya: masuk ke aplikasi, lalu isi Produk & Stok.`);
+console.log(
+  `\nLangkah berikutnya: masuk ke aplikasi. Anda akan diminta memilih jenis`,
+);
+console.log(`usaha (dagang / jasa / campuran) sebelum menu ditampilkan.`);

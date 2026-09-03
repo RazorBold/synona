@@ -18,9 +18,15 @@ import { AvatarInisial } from "@/components/ui/avatar-inisial";
 import { IconButton } from "@/components/ui/icon-button";
 import { formatRupiah } from "@/lib/money";
 import { PAKET, type Paket } from "@/lib/paket";
+import {
+  JENIS_USAHA,
+  LABEL_JENIS_USAHA,
+  type JenisUsaha,
+} from "@/lib/usaha";
 import { cn } from "@/lib/utils";
 import {
   nonaktifkanStaf,
+  simpanJenisUsaha,
   simpanOutlet,
   simpanProfilPemilik,
   simpanStaf,
@@ -32,11 +38,13 @@ export function OutletClient({
   outlet,
   staf,
   pemilik,
+  jenisUsaha,
   berlakuSampai,
 }: {
   outlet: BarisOutlet[];
   staf: BarisStaf[];
   pemilik: { id: string; nama: string; email: string; telepon: string | null; paket: Paket };
+  jenisUsaha: JenisUsaha | null;
   berlakuSampai: string;
 }) {
   const batas = PAKET[pemilik.paket];
@@ -49,6 +57,21 @@ export function OutletClient({
   const [profilOpen, setProfilOpen] = useState(false);
   const [pilihOutlet, setPilihOutlet] = useState<BarisOutlet | null>(null);
   const [pilihStaf, setPilihStaf] = useState<BarisStaf | null>(null);
+  const [gantiPending, setGantiPending] = useState<JenisUsaha | null>(null);
+
+  async function gantiJenis(jenis: JenisUsaha) {
+    if (
+      !confirm(
+        `Ubah jenis usaha menjadi "${LABEL_JENIS_USAHA[jenis]}"? Menu akan menyesuaikan; data yang sudah ada tetap tersimpan.`,
+      )
+    )
+      return;
+
+    setGantiPending(jenis);
+    const hasil = await aman(simpanJenisUsaha({ jenis }));
+    setGantiPending(null);
+    if (!hasil.ok) alert(hasil.error);
+  }
 
   async function nonaktifkan(s: BarisStaf) {
     if (!confirm(`Nonaktifkan ${s.nama} dari ${s.namaOutlet}?`)) return;
@@ -91,6 +114,45 @@ export function OutletClient({
           </button>
         </div>
       </div>
+
+      {/* Jenis usaha — menentukan menu yang tampil */}
+      <section className="card min-w-0 p-5">
+        <h2 className="card-title text-[17px]">Jenis Usaha</h2>
+        <p className="mt-1 text-sm text-muted">
+          Menentukan menu mana yang muncul. Menggantinya tidak menghapus data
+          apa pun — menu yang disembunyikan hanya disembunyikan.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {JENIS_USAHA.map((j) => {
+            const aktif = jenisUsaha === j.key;
+            return (
+              <button
+                key={j.key}
+                onClick={() => gantiJenis(j.key)}
+                disabled={aktif || gantiPending !== null}
+                className={cn(
+                  "rounded-2xl border p-4 text-left transition-colors disabled:cursor-default",
+                  aktif
+                    ? "border-brand-300 bg-brand-50"
+                    : "border-line bg-white hover:border-brand-200",
+                )}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="text-xl">{j.emoji}</span>
+                  <span className="text-sm font-bold text-ink">{j.label}</span>
+                  {gantiPending === j.key && (
+                    <Loader2 className="size-3.5 animate-spin text-muted" />
+                  )}
+                </span>
+                <span className="mt-1.5 block text-xs text-muted">
+                  {j.ringkas}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Paket langganan */}
       <section className="card overflow-hidden">

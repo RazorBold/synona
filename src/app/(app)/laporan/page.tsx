@@ -1,5 +1,6 @@
 import { LaporanClient } from "@/components/laporan/laporan-client";
 import { businessDate, tambahHari } from "@/lib/date";
+import { punyaJasa } from "@/lib/usaha";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import {
   getArusKas,
@@ -7,6 +8,8 @@ import {
   getKesehatanKeuangan,
   getProfitabilitasProduk,
 } from "@/server/queries/kesehatan";
+import { getSaldoAkun } from "@/server/queries/kas";
+import { getPendapatanPetugas } from "@/server/queries/layanan";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +36,16 @@ export default async function LaporanPage({
   const labelPeriode =
     periode === "7hari" ? "7 Hari" : periode === "30hari" ? "30 Hari" : "Bulan Ini";
 
-  const [keuangan, inventory, arusKas, produk] = await Promise.all([
+  const [keuangan, inventory, arusKas, produk, saldoAkun, petugas] =
+    await Promise.all([
     getKesehatanKeuangan(outlet.id, dari, hariIni),
     getKesehatanInventory(outlet.id, dari, hariIni),
     getArusKas(outlet.id, dari, hariIni),
     getProfitabilitasProduk(outlet.id, dari, hariIni),
+    getSaldoAkun(outlet.id, dari, hariIni),
+    punyaJasa(outlet.jenisUsaha)
+      ? getPendapatanPetugas(outlet.id, dari, hariIni)
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -45,7 +53,10 @@ export default async function LaporanPage({
       keuangan={keuangan}
       inventory={inventory}
       arusKas={arusKas}
+      saldoAkun={saldoAkun}
+      petugas={petugas}
       produk={produk}
+      jenisUsaha={outlet.jenisUsaha}
       periode={periode}
       labelPeriode={labelPeriode}
     />

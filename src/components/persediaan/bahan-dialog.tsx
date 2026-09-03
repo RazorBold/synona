@@ -7,9 +7,16 @@ import { useEffect, useState } from "react";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { SatuanBahan } from "@/lib/satuan";
-import { simpanBahan } from "@/server/actions/bahan";
-import type { BarisBahan } from "@/server/queries/bahan";
+import { simpanBahan } from "@/server/actions/persediaan";
+import type { JenisBahan } from "@/lib/persediaan";
+import type { BarisBahan } from "@/server/queries/persediaan";
 import { aman } from "@/lib/aksi";
+
+const JENIS: { key: JenisBahan; label: string; ket: string }[] = [
+  { key: "baku", label: "Bahan Baku", ket: "masih harus diolah" },
+  { key: "setengah_jadi", label: "Setengah Jadi", ket: "hasil olahan, dipakai lagi" },
+  { key: "jadi", label: "Barang Jadi", ket: "siap pakai / siap jual" },
+];
 
 const SATUAN: { key: SatuanBahan; label: string; ket: string }[] = [
   { key: "g", label: "Gram", ket: "beras, kopi, gula" },
@@ -29,6 +36,7 @@ export function BahanDialog({
   const edit = Boolean(bahan);
 
   const [nama, setNama] = useState("");
+  const [jenis, setJenis] = useState<JenisBahan>("baku");
   const [satuan, setSatuan] = useState<SatuanBahan>("g");
   const [batasStok, setBatasStok] = useState(0);
   const [stokAwal, setStokAwal] = useState(0);
@@ -39,6 +47,7 @@ export function BahanDialog({
   useEffect(() => {
     if (!open) return;
     setNama(bahan?.nama ?? "");
+    setJenis(bahan?.jenis ?? "baku");
     setSatuan(bahan?.satuan ?? "g");
     setBatasStok(bahan?.batasStok ?? 0);
     setStokAwal(0);
@@ -56,6 +65,7 @@ export function BahanDialog({
     const hasil = await aman(simpanBahan({
       id: bahan?.id ?? null,
       nama,
+      jenis,
       satuan,
       batasStok,
       stokAwal: stokAwal * faktor,
@@ -75,12 +85,12 @@ export function BahanDialog({
           <div className="flex items-start justify-between border-b border-line px-6 py-5">
             <div>
               <Dialog.Title className="text-lg font-extrabold tracking-tight text-ink">
-                {edit ? "Ubah Bahan Baku" : "Tambah Bahan Baku"}
+                {edit ? "Ubah Item Persediaan" : "Tambah Item Persediaan"}
               </Dialog.Title>
               <Dialog.Description className="mt-0.5 text-sm text-muted">
                 {edit
                   ? "Stok dan harga berubah lewat pembelian atau penyesuaian."
-                  : "Bahan mentah yang dipakai untuk membuat produk jualan."}
+                  : "Bahan mentah, olahan setengah jadi, atau barang jadi."}
               </Dialog.Description>
             </div>
             <Dialog.Close className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-canvas">
@@ -91,7 +101,7 @@ export function BahanDialog({
           <div className="thin-scroll flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <div>
               <label className="text-sm font-semibold text-ink">
-                Nama bahan
+                Nama item
               </label>
               <input
                 autoFocus
@@ -100,6 +110,31 @@ export function BahanDialog({
                 placeholder="Contoh: Biji Kopi Arabika"
                 className={inputKelas}
               />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-ink">Jenis</label>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {JENIS.map((j) => (
+                  <button
+                    key={j.key}
+                    onClick={() => setJenis(j.key)}
+                    className={cn(
+                      "rounded-2xl border px-2 py-3 text-center transition-colors",
+                      jenis === j.key
+                        ? "border-brand-300 bg-brand-50"
+                        : "border-line bg-white hover:bg-canvas",
+                    )}
+                  >
+                    <span className="block text-[13px] font-bold text-ink">
+                      {j.label}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-tight text-muted">
+                      {j.ket}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

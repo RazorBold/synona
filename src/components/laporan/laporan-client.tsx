@@ -9,6 +9,7 @@ import {
   TriangleAlert,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
@@ -24,6 +25,14 @@ import type {
   KesehatanKeuangan,
   Status,
 } from "@/server/queries/kesehatan";
+import { LABEL_JENIS_AKUN } from "@/lib/kas";
+import { punyaBarang, type JenisUsaha } from "@/lib/usaha";
+import type { SaldoAkun } from "@/server/queries/kas";
+import type { BarisPetugas } from "@/server/queries/layanan";
+
+function jumlah(baris: SaldoAkun[], kunci: keyof SaldoAkun): number {
+  return baris.reduce((a, b) => a + (b[kunci] as number), 0);
+}
 
 const PERIODE = [
   ["bulan", "Bulan ini"],
@@ -56,13 +65,19 @@ export function LaporanClient({
   keuangan,
   inventory,
   arusKas,
+  saldoAkun,
+  petugas,
   produk,
+  jenisUsaha,
   periode,
   labelPeriode,
 }: {
   keuangan: KesehatanKeuangan;
   inventory: KesehatanInventory;
   arusKas: ArusKas;
+  saldoAkun: SaldoAkun[];
+  petugas: BarisPetugas[];
+  jenisUsaha: JenisUsaha | null;
   produk: BarisProfit[];
   periode: string;
   labelPeriode: string;
@@ -156,7 +171,8 @@ export function LaporanClient({
           />
         </PanelKesehatan>
 
-        {/* Kesehatan inventory */}
+        {/* Kesehatan inventory — hanya berarti kalau ada barang */}
+        {punyaBarang(jenisUsaha) && (
         <PanelKesehatan
           judul="Kesehatan Inventory"
           status={inventory.status}
@@ -194,6 +210,7 @@ export function LaporanClient({
             tone={inventory.stokMati > 0 ? "warning" : "success"}
           />
         </PanelKesehatan>
+        )}
 
         {/* Arus kas rinci */}
         <section className="card flex flex-col p-5">
@@ -252,6 +269,140 @@ export function LaporanClient({
           </div>
         </section>
       </div>
+
+      {petugas.length > 0 && (
+        <section className="card min-w-0 p-5">
+          <h2 className="card-title text-[17px]">Pendapatan per Petugas</h2>
+          <p className="mt-1 text-xs text-muted">
+            Dari layanan yang ditandai petugasnya. Baris &ldquo;Belum
+            ditandai&rdquo; berarti pekerjaannya tidak dicatat siapa yang
+            mengerjakan.
+          </p>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[520px] border-collapse">
+              <thead>
+                <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th className="pb-3 pl-2 pr-3">Petugas</th>
+                  <th className="pb-3 pr-3 text-right">Pekerjaan</th>
+                  <th className="pb-3 pr-3 text-right">Pendapatan</th>
+                  <th className="pb-3 pr-2 text-right">Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {petugas.map((p) => (
+                  <tr
+                    key={p.staffId ?? "tanpa"}
+                    className="border-b border-line/70"
+                  >
+                    <td className="py-3 pl-2 pr-3">
+                      <span
+                        className={cn(
+                          "text-sm font-semibold",
+                          p.staffId ? "text-ink" : "text-muted",
+                        )}
+                      >
+                        {p.nama}
+                      </span>
+                    </td>
+                    <td className="tabular py-3 pr-3 text-right text-sm text-ink-soft">
+                      {p.jumlahPekerjaan}
+                    </td>
+                    <td className="tabular py-3 pr-3 text-right text-sm font-bold text-ink">
+                      {formatRupiah(p.omzet)}
+                    </td>
+                    <td className="tabular py-3 pr-2 text-right text-sm font-semibold text-success">
+                      {formatRupiah(p.margin)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Arus kas per akun — jawaban untuk "uangnya sekarang ada di mana" */}
+      <section className="card min-w-0 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 className="card-title text-[17px]">Arus Kas per Akun</h2>
+            <p className="mt-1 text-xs text-muted">
+              Total di atas tidak memberi tahu uangnya ada di laci atau di
+              rekening. Tabel ini memisahkannya.
+            </p>
+          </div>
+          <Link href="/kas" className="link-more">
+            Lihat mutasi rinci <ArrowUpRight className="size-3.5" />
+          </Link>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[560px] border-collapse">
+            <thead>
+              <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                <th className="pb-3 pl-2 pr-3">Akun</th>
+                <th className="pb-3 pr-3 text-right">Saldo Awal</th>
+                <th className="pb-3 pr-3 text-right">Masuk</th>
+                <th className="pb-3 pr-3 text-right">Keluar</th>
+                <th className="pb-3 pr-2 text-right">Saldo Akhir</th>
+              </tr>
+            </thead>
+            <tbody>
+              {saldoAkun.map((s) => (
+                <tr key={s.id} className="border-b border-line/70">
+                  <td className="py-3 pl-2 pr-3">
+                    <p className="text-sm font-semibold text-ink">{s.nama}</p>
+                    <p className="text-xs text-muted">
+                      {s.namaBank ?? LABEL_JENIS_AKUN[s.jenis]}
+                    </p>
+                  </td>
+                  <td className="tabular py-3 pr-3 text-right text-sm text-ink-soft">
+                    {formatRupiah(s.saldoAwal)}
+                  </td>
+                  <td className="tabular py-3 pr-3 text-right text-sm font-semibold text-success">
+                    {formatRupiah(s.masuk)}
+                  </td>
+                  <td className="tabular py-3 pr-3 text-right text-sm font-semibold text-danger">
+                    {formatRupiah(s.keluar)}
+                  </td>
+                  <td
+                    className={cn(
+                      "tabular py-3 pr-2 text-right text-sm font-extrabold",
+                      s.saldoAkhir < 0 ? "text-danger" : "text-ink",
+                    )}
+                  >
+                    {formatRupiah(s.saldoAkhir)}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td className="py-3 pl-2 pr-3 text-sm font-extrabold text-ink">
+                  Total
+                </td>
+                <td className="tabular py-3 pr-3 text-right text-sm font-bold text-ink-soft">
+                  {formatRupiah(jumlah(saldoAkun, "saldoAwal"))}
+                </td>
+                <td className="tabular py-3 pr-3 text-right text-sm font-extrabold text-success">
+                  {formatRupiah(jumlah(saldoAkun, "masuk"))}
+                </td>
+                <td className="tabular py-3 pr-3 text-right text-sm font-extrabold text-danger">
+                  {formatRupiah(jumlah(saldoAkun, "keluar"))}
+                </td>
+                <td className="tabular py-3 pr-2 text-right text-base font-extrabold text-ink">
+                  {formatRupiah(jumlah(saldoAkun, "saldoAkhir"))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {saldoAkun.length === 0 && (
+          <p className="py-10 text-center text-sm text-muted">
+            Belum ada akun kas. Buat dulu di menu Kas &amp; Bank.
+          </p>
+        )}
+      </section>
 
       {/* Barang kritis */}
       {inventory.kritis.length > 0 && (

@@ -10,6 +10,7 @@ import { outlets, staff, users } from "@/db/schema";
 import { PAKET, type Paket } from "@/lib/paket";
 import { normalisasiNomorHp } from "@/lib/wa";
 import { wajibSesi } from "@/server/auth";
+import { buatAkunKasBawaan } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -88,8 +89,15 @@ export async function simpanOutlet(input: unknown): Promise<HasilAksi> {
           name: d.nama,
           address: d.alamat,
           phone: d.telepon ? normalisasiNomorHp(d.telepon) : null,
+          // Cabang baru mengikuti jenis usaha yang sudah dipilih — kalau
+          // dibiarkan kosong, membuka cabang justru melempar pemilik kembali
+          // ke layar onboarding.
+          jenisUsaha: aktif.jenisUsaha,
         })
         .run();
+
+      // Outlet baru langsung punya kas, bank, dan QRIS — lihat src/server/kas.ts.
+      buatAkunKasBawaan(tx as never, id);
 
       // Pemilik otomatis jadi staf di outlet barunya.
       tx.insert(staff)
@@ -297,4 +305,38 @@ function pesan(e: unknown): string {
     return "Email itu sudah dipakai pengguna lain";
   }
   return p;
+}
+
+const JenisUsahaInput = z.object({
+  jenis: z.enum(["dagang", "jasa", "campuran"]),
+});
+
+/**
+ * Menyimpan jenis usaha. Dipakai layar penyiapan dan Pengaturan → Outlet.
+ * Pilihan pada halaman masuk memakai jalur lain (lihat `masuk()`), karena di
+ * sana penggunanya belum punya sesi.
+ *
+ * Menggantinya tidak menghapus apa pun: menu yang disembunyikan hanya
+ * disembunyikan. Pemilik yang tadinya "jasa" lalu pindah ke "campuran" akan
+ * menemukan katalog produknya utuh seperti sebelumnya.
+ */
+export async function simpanJenisUsaha(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
+  const parsed = JenisUsahaInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Pilih dulu jenis usahanya" };
+  }
+  const aktif = await getOutletAktif();
+
+  try {
+    db.update(outlets)
+      .set({ jenisUsaha: parsed.data.jenis })
+      .where(eq(outlets.id, aktif.id))
+      .run();
+  } catch (e) {
+    return { ok: false, error: pesan(e) };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

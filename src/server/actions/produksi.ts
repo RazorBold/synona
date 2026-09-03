@@ -180,7 +180,7 @@ export async function catatProduksi(input: unknown): Promise<HasilAksi> {
 
     revalidatePath("/produksi");
     revalidatePath("/produk");
-    revalidatePath("/bahan");
+    revalidatePath("/persediaan");
     revalidatePath("/kasir");
     revalidatePath("/");
 

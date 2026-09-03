@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { customers, debtPayments, debts } from "@/db/schema";
 import { wajibSesi } from "@/server/auth";
+import { pilihAkunKas } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getRiwayatCicilan } from "@/server/queries/kasbon";
 
@@ -17,6 +18,7 @@ const BayarInput = z.object({
   debtId: z.string().min(1),
   jumlah: z.coerce.number().int().positive("Jumlah bayar harus lebih dari 0"),
   metode: z.enum(["cash", "qris", "transfer", "other"]).default("cash"),
+  akunKasId: z.string().nullable().default(null),
   catatan: z.string().trim().max(120).nullable().default(null),
 });
 
@@ -64,6 +66,7 @@ export async function catatPembayaran(input: unknown): Promise<HasilAksi> {
           debtId: utang.id,
           amount: d.jumlah,
           method: d.metode,
+          cashAccountId: pilihAkunKas(tx, outlet.id, d.akunKasId, d.metode),
           paidAt: Date.now(),
           note: d.catatan,
           recordedBy: outlet.ownerId,
