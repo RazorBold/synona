@@ -42,3 +42,44 @@ export function pesanStruk(opts: {
     .join(", ");
   return `Halo kak ${opts.nama} 🙏 Terima kasih sudah belanja di ${opts.toko}. Rincian: ${rincian}. Total: ${formatRupiah(opts.total)} (${opts.metode}).`;
 }
+
+/** Nota tanda terima jasa — pengganti kertas yang gampang hilang. */
+export function pesanTandaTerima(opts: {
+  nama: string;
+  toko: string;
+  nomor: string;
+  item: { nama: string; total: number }[];
+  total: number;
+  dibayar: number;
+  sisa: number;
+  janjiSelesai?: string | null;
+}): string {
+  const rincian = opts.item
+    .map((i) => `• ${i.nama} = ${formatRupiah(i.total)}`)
+    .join("\n");
+
+  const bayar =
+    opts.sisa > 0
+      ? `Dibayar: ${formatRupiah(opts.dibayar)}\nSisa saat diambil: ${formatRupiah(opts.sisa)}`
+      : `Lunas: ${formatRupiah(opts.total)}`;
+
+  const janji = opts.janjiSelesai
+    ? `\nPerkiraan selesai: ${opts.janjiSelesai}`
+    : "";
+
+  return `Halo kak ${opts.nama} 🙏 Terima kasih sudah mempercayakan pekerjaannya ke ${opts.toko}.\n\nNo. pesanan: ${opts.nomor}\n${rincian}\n\nTotal: ${formatRupiah(opts.total)}\n${bayar}${janji}\n\nSimpan pesan ini sebagai tanda terima ya 😊`;
+}
+
+/** Kabar bahwa pekerjaan sudah selesai dan barangnya bisa diambil. */
+export function pesanSiapDiambil(opts: {
+  nama: string;
+  toko: string;
+  nomor: string;
+  sisa: number;
+}): string {
+  const sisa =
+    opts.sisa > 0
+      ? ` Sisa pembayaran ${formatRupiah(opts.sisa)} bisa dilunasi saat pengambilan.`
+      : " Pembayarannya sudah lunas.";
+  return `Halo kak ${opts.nama} 😊 Pesanan ${opts.nomor} di ${opts.toko} sudah selesai dan siap diambil.${sisa} Terima kasih 🙏`;
+}

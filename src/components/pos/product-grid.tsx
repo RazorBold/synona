@@ -85,8 +85,10 @@ export function ProductGrid({ produk, kategori }: Props) {
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
           {hasil.map((p) => {
             const diKeranjang = qtyDiKeranjang.get(p.id) ?? 0;
-            const habis = p.stok <= 0;
-            const penuh = diKeranjang >= p.stok;
+            // Produk tanpa lacak stok tidak pernah habis dan tidak pernah penuh.
+            const dilacak = p.lacakStok === 1;
+            const habis = dilacak && p.stok <= 0;
+            const penuh = dilacak && diKeranjang >= p.stok;
 
             return (
               <button
@@ -101,6 +103,7 @@ export function ProductGrid({ produk, kategori }: Props) {
                     gambar: p.gambar,
                     harga: p.harga,
                     stok: p.stok,
+                    lacakStok: p.lacakStok,
                     unit: p.unit,
                   })
                 }
@@ -141,14 +144,21 @@ export function ProductGrid({ produk, kategori }: Props) {
                   <span className="tabular text-sm font-bold text-brand-600">
                     {formatRupiah(p.harga)}
                   </span>
-                  <span
-                    className={cn(
-                      "tabular shrink-0 text-[11px] font-medium",
-                      p.stok <= p.batasStok ? "text-danger" : "text-muted",
-                    )}
-                  >
-                    Sisa {p.stok}
-                  </span>
+                  {dilacak ? (
+                    <span
+                      className={cn(
+                        "tabular shrink-0 text-[11px] font-medium",
+                        p.stok <= p.batasStok ? "text-danger" : "text-muted",
+                      )}
+                    >
+                      Sisa {p.stok}
+                    </span>
+                  ) : (
+                    /* "Sisa 0" pada produk masak-saat-pesan cuma bikin panik. */
+                    <span className="shrink-0 text-[11px] font-medium text-muted">
+                      Selalu ada
+                    </span>
+                  )}
                 </div>
               </button>
             );

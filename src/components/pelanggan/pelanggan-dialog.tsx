@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { normalisasiNomorHp } from "@/lib/wa";
 import { simpanPelanggan } from "@/server/actions/pelanggan";
 import type { BarisPelanggan } from "@/server/queries/pelanggan";
+import { aman } from "@/lib/aksi";
 
 type Props = {
   open: boolean;
@@ -37,12 +38,12 @@ export function PelangganDialog({ open, onOpenChange, pelanggan }: Props) {
     setPending(true);
     setError(null);
 
-    const hasil = await simpanPelanggan({
+    const hasil = await aman(simpanPelanggan({
       id: pelanggan?.id ?? null,
       nama,
       phone: phone.trim() || null,
       catatan: catatan.trim() || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

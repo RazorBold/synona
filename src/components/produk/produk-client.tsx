@@ -20,11 +20,12 @@ import { Chip } from "@/components/ui/chip";
 import { GambarProduk } from "@/components/ui/gambar-produk";
 import { IconButton } from "@/components/ui/icon-button";
 import { StokDialog } from "@/components/produk/stok-dialog";
-import type { BarisBahan } from "@/server/queries/bahan";
+import type { BarisBahan } from "@/server/queries/persediaan";
 import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { arsipkanProduk } from "@/server/actions/produk";
 import type { BarisProduk } from "@/server/queries/produk";
+import { aman } from "@/lib/aksi";
 
 type Statistik = {
   jumlah: number;
@@ -41,15 +42,18 @@ export function ProdukClient({
   kategori,
   statistik,
   bahan,
+  statusAwal = "semua",
 }: {
   produk: BarisProduk[];
   kategori: { id: string; nama: string }[];
   statistik: Statistik;
   bahan: BarisBahan[];
+  /** Dari ?filter= di URL — dashboard menaut ke sini dengan filter siap pakai. */
+  statusAwal?: Status;
 }) {
   const [cari, setCari] = useState("");
   const [kategoriId, setKategoriId] = useState<string | null>(null);
-  const [status, setStatus] = useState<Status>("semua");
+  const [status, setStatus] = useState<Status>(statusAwal);
 
   const [formOpen, setFormOpen] = useState(false);
   const [stokOpen, setStokOpen] = useState(false);
@@ -60,6 +64,8 @@ export function ProdukClient({
     const kunci = cari.trim().toLowerCase();
     return produk.filter((p) => {
       if (kategoriId && p.kategoriId !== kategoriId) return false;
+      // Produk tanpa lacak stok tidak pernah "menipis" atau "habis".
+      if (status !== "semua" && p.lacakStok !== 1) return false;
       if (status === "menipis" && !(p.stok > 0 && p.stok <= p.batasStok))
         return false;
       if (status === "habis" && p.stok > 0) return false;
@@ -96,7 +102,7 @@ export function ProdukClient({
   async function arsipkan(p: BarisProduk) {
     if (!confirm(`Arsipkan "${p.nama}"? Produk disembunyikan dari POS, riwayat penjualannya tetap tersimpan.`))
       return;
-    await arsipkanProduk(p.id);
+    await aman(arsipkanProduk(p.id));
   }
 
   return (
@@ -255,7 +261,7 @@ export function ProdukClient({
                     </span>
                   </td>
                   <td className="py-3 pr-3 text-right">
-                    <BadgeStok stok={p.stok} batas={p.batasStok} unit={p.unit} />
+                    <BadgeStok stok={p.stok} batas={p.batasStok} unit={p.unit} lacakStok={p.lacakStok} />
                   </td>
                   <td className="py-3 pr-2">
                     <div className="flex items-center justify-end gap-1.5">
@@ -307,7 +313,7 @@ export function ProdukClient({
                     {p.kategori ?? "Tanpa kategori"} · {p.sku ?? "Tanpa SKU"}
                   </p>
                 </div>
-                <BadgeStok stok={p.stok} batas={p.batasStok} unit={p.unit} />
+                <BadgeStok stok={p.stok} batas={p.batasStok} unit={p.unit} lacakStok={p.lacakStok} />
               </div>
 
               <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
@@ -448,11 +454,23 @@ function BadgeStok({
   stok,
   batas,
   unit,
+  lacakStok = 1,
 }: {
   stok: number;
   batas: number;
   unit: string;
+  lacakStok?: number;
 }) {
+  // Produk masak-saat-pesan tidak punya angka stok yang bermakna — menandainya
+  // "Habis" hanya menakuti pemilik dan menyembunyikannya dari kasir.
+  if (lacakStok !== 1) {
+    return (
+      <span className="inline-flex shrink-0 items-center rounded-full bg-canvas px-2.5 py-1 text-xs font-bold text-muted">
+        Tidak dilacak
+      </span>
+    );
+  }
+
   const habis = stok <= 0;
   const menipis = !habis && stok <= batas;
 

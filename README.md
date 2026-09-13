@@ -13,8 +13,10 @@ Stack: **Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · SQLite 3 (be
 
 ```bash
 npm install
+echo "SYNONA_JWT_SECRET=$(node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64url'))\")" > .env
 npm run db:migrate    # membuat data/synona.db + seluruh tabel
 npm run db:seed       # mengisi data demo (Bu Sari, Outlet Utama, 7 hari transaksi)
+npm run auth:init     # akun demo admin / admin
 npm run dev           # http://localhost:3000
 ```
 
@@ -31,6 +33,9 @@ npm run dev           # http://localhost:3000
 | `npm run db:seed` | Mengisi ulang data demo (menghapus isi tabel lebih dulu) |
 | `npm run db:reset` | Hapus DB → migrasi → seed |
 | `npm run db:studio` | Drizzle Studio (penjelajah data) |
+| `npm run auth:init` | Seed akun demo `admin` / `admin` (idempoten) |
+| `npm run auth:reset [nama]` | Reset sandi dari server — jalan terakhir kalau sandi & kode pemulihan hilang |
+| `npm run data:kosongkan` | Hapus data usaha demo, siapkan outlet kosong (pratinjau dulu; butuh `--ya`) |
 
 ## Struktur singkat
 
@@ -87,7 +92,106 @@ Sejak `synona-alur-flowchart.pdf`, alur produk dirombak: owner mencatat **4 jeni
 
 Skema database untuk seluruh alur baru sudah terpasang (8 tabel: bahan baku, buku besar bahan, resep/BOM, produksi, pembelian, hutang supplier, beban). Rancangan lengkap dan urutan pengerjaannya ada di [PRD-TEKNIS.md §16](PRD-TEKNIS.md).
 
+## Autentikasi
+
+Seluruh halaman dan **setiap** server action mewajibkan sesi yang sah. Penjaganya berlapis dan sengaja tidak bergantung pada satu titik:
+
+| Lapisan | Berkas | Yang dijamin |
+|---|---|---|
+| Middleware | `src/middleware.ts` | Menolak navigasi tanpa JWT yang tanda tangannya sah |
+| Guard action | `wajibSesi()` di `src/server/auth.ts` | Dipanggil di awal tiap server action — inilah lapisan yang benar-benar menjamin |
+| Layout | `src/app/(app)/layout.tsx` | Memastikan akun di token masih ada di database |
+
+Middleware saja **tidak cukup**: server action dipanggil lewat POST ke URL halaman mana pun dengan header `Next-Action`, jadi guard di dalam action-nya wajib.
+
+### Akun demo
+
+`npm run auth:init` membuat akun `admin` dengan sandi `admin`. **Ini kredensial demo, bukan kredensial produksi** — ganti di `/ganti-sandi` sebelum aplikasi dipakai dengan data pelanggan sungguhan. Selama sandi bawaan itu masih aktif, aplikasi menampilkan banner peringatan di setiap halaman; banner hilang sendiri setelah sandinya diganti (dideteksi dengan mencocokkan hash, bukan flag terpisah yang bisa basi).
+
+### Lupa sandi
+
+Deployment ini tidak punya SMTP, dan `wa.me` hanya membuka tautan chat — tidak bisa mengirim pesan otomatis. Jadi pemulihannya memakai **kode pemulihan** yang dicatat sendiri oleh pemilik, bukan tautan reset lewat email.
+
+1. Saat sudah masuk, buka **Ganti Sandi** → **Buat kode pemulihan**. Kodenya berbentuk `SYN-XXXX-XXXX-XXXX-XXXX` dan **hanya ditampilkan sekali** — catat di tempat aman.
+2. Kalau sandinya lupa, buka `/lupa-sandi`, masukkan nama pengguna + kode itu + sandi baru.
+3. Kode bersifat **sekali pakai**: setelah terpakai, kolomnya dikosongkan. Buat kode baru setelah masuk.
+
+Yang disimpan di database hanya hash kodenya (scrypt + salt), sama seperti sandi — kode aslinya tidak bisa dibaca ulang dari DB.
+
+Kalau sandi **dan** kode pemulihan sama-sama hilang, jalan terakhirnya di server:
+
+```bash
+npm run auth:reset            # akun "admin"
+npm run auth:reset -- kasir1  # akun lain
+```
+
+Sandi barunya acak dan ditulis ke `.sandi-baru.txt` (mode 600, sudah di-gitignore) — tidak dicetak ke terminal, karena keluaran terminal gampang tersimpan di riwayat shell atau log pm2.
+
+### Nomor bantuan WhatsApp
+
+Kartu "Butuh bantuan?" di sidebar hanya muncul kalau `SYNONA_WA_BANTUAN` diisi di `.env` (format `62812…`, tanpa `+` atau spasi). Kalau kosong, kartunya disembunyikan — lebih baik tidak ada daripada menautkan ke nomor contoh yang tidak dijawab siapa pun.
+
+### Sesi yang akunnya sudah tidak ada
+
+Kalau cookie masih sah tapi baris `pengguna`-nya hilang (kasir dihapus, DB dipulihkan dari backup, `db:reset`), permintaan dialihkan ke route handler `/sesi-berakhir` yang **menghapus cookie** lalu melempar ke `/masuk`.
+
+Ini bukan detail kosmetik: tanpa penghapusan cookie, `/` mengalihkan ke `/masuk`, lalu `/masuk` melihat token yang masih sah dan memantulkannya balik — pengguna terkunci dalam redirect tak berujung dan tombol Keluar pun tidak bisa diklik karena tidak ada halaman yang berhasil dimuat. Cookie hanya dihapus kalau sesinya memang sudah tidak sah, supaya rute GET ini tidak bisa dipakai halaman lain sebagai logout paksa.
+
+### Secret JWT
+
+Sesi dibawa sebagai JWT HS256 di cookie `httpOnly`, ditandatangani dengan `SYNONA_JWT_SECRET` dari `.env`. Kalau variabel itu tidak ada, **aplikasi sengaja menolak start** (`src/instrumentation.ts`) — tidak ada nilai default, karena secret bawaan yang diam-diam terpakai di produksi jauh lebih berbahaya daripada aplikasi yang gagal start.
+
+`.env` ada di `.gitignore`. Jangan pernah menuliskan isinya ke git, log, atau tiket.
+
+### Batasan: sesi JWT tidak bisa dicabut satu per satu
+
+Ini konsekuensi yang harus diketahui sebelum memakainya:
+
+- **Tidak ada daftar sesi di database.** Token yang sudah diterbitkan tetap sah sampai `exp`-nya lewat (30 hari), termasuk setelah pemiliknya ganti sandi.
+- **Mencabut akses = mengganti `SYNONA_JWT_SECRET`.** Itu membatalkan *semua* token sekaligus dan memaksa setiap perangkat login ulang — tidak bisa hanya satu perangkat.
+- Kalau nanti butuh pencabutan per-sesi (mis. "keluarkan HP yang hilang"), sesi harus dipindah ke tabel di database; JWT tanpa daftar sesi tidak bisa memberikannya.
+
+## Mulai dari data sendiri (bukan data demo)
+
+`npm run db:seed` mengisi data demo Bu Sari — 26 produk dan ratusan transaksi fiktif. Sebelum dipakai pemilik sungguhan, kosongkan dulu:
+
+```bash
+npm run data:kosongkan -- "Warung Bu Ani" "Bu Ani"        # pratinjau, tidak mengubah apa pun
+npm run data:kosongkan -- "Warung Bu Ani" "Bu Ani" --ya   # jalankan
+```
+
+Perintah ini membuat backup otomatis ke `data/backup/` lebih dulu, lalu mengosongkan seluruh tabel usaha dan menyiapkan satu outlet kosong. **Akun login di tabel `pengguna` tidak disentuh** — mengosongkan data usaha tidak boleh sekaligus mengunci pemiliknya keluar.
+
+## Produk tanpa lacak stok
+
+Setiap produk punya tanda **"Jangan lacak stok produk ini"** di form produk. Untuk F&B masak-saat-pesan (nasi goreng, kopi susu) atau jasa, tidak ada "stok" yang masuk akal — tanpa opsi ini penjual harus mengisi stok palsu yang besar, atau POS menolak penjualan dengan "Stok tinggal 0" di tengah jam ramai.
+
+Produk yang tidak dilacak: tidak pernah dianggap habis di kasir, tidak mengurangi stok, tidak menulis ke `stock_movements`, dan tidak ikut filter "menipis"/"habis". Di kasir labelnya "Selalu ada", di daftar produk "Tidak dilacak".
+
+Produk lama tetap dilacak (`lacak_stok` default `1`), jadi migrasinya tidak mengubah perilaku apa pun.
+
+## PWA
+
+Manifest, ikon (termasuk varian maskable), dan service worker sudah terpasang.
+
+**Yang di-cache service worker hanya aset build ber-hash di `/_next/static/`.** Halaman HTML, `/api/`, dan semua permintaan non-GET diteruskan apa adanya ke jaringan. Ini disengaja:
+
+- **Tidak ada mode offline untuk mencatat penjualan.** Menyimpan transaksi ke antrean offline lalu menampilkan "tersimpan" adalah cara tercepat membuat pemilik warung kehilangan uang — struk keluar, stok berkurang di layar, tapi server tidak pernah menerimanya. Offline sungguhan butuh antrean tersinkron dengan penyelesaian konflik, dan itu keputusan produk.
+- **Halaman HTML tidak di-cache** karena isinya bergantung pada sesi; halaman ter-cache bisa memperlihatkan data outlet ke orang yang sudah logout.
+
+> **Pemasangan ke layar utama butuh HTTPS.** Browser hanya mengizinkan service worker dan "Add to Home Screen" di konteks aman. Deployment sekarang masih HTTP di LAN, jadi tombol pasang belum akan muncul sampai TLS dipasang di depan nginx. Manifest dan ikonnya sudah siap dan akan langsung berfungsi begitu itu ada.
+
+## Penanganan galat di sisi klien
+
+Server action bisa **melempar**, bukan cuma mengembalikan `{ ok: false }` — sesi habis (middleware menjawab 401), jaringan putus, atau galat tak terduga. Karena itu setiap pemanggilan aksi dari komponen dibungkus `aman()` (`src/lib/aksi.ts`), yang mengubah lemparan jadi hasil `ok: false` biasa.
+
+Tanpa pembungkus itu, promise-nya ditolak, baris `setPending(false)` di bawahnya tidak pernah jalan, dan **tombolnya berputar selamanya** tanpa pesan apa pun. `aman()` sengaja meneruskan lemparan `NEXT_REDIRECT`, karena `redirect()` di server action memang bekerja dengan cara melempar.
+
+Galat render ditangani `src/app/error.tsx` (dan `global-error.tsx` sebagai jaring terakhir), sementara alamat yang tidak ada masuk ke `src/app/not-found.tsx`. Ketiganya berbahasa Indonesia — bawaan Next adalah layar Inggris "Application error: a client-side exception has occurred" yang tidak berarti apa-apa bagi pemilik warung.
+
 ## Catatan deploy
 
 **Jangan deploy ke Vercel/Netlify serverless** — filesystem-nya ephemeral sehingga file SQLite hilang. Gunakan VPS/Docker dengan volume persisten, satu replica. Detail dan jalur migrasi ke Turso/Postgres ada di [PRD-TEKNIS.md §11](PRD-TEKNIS.md).
+
+Proses Next.js **hanya listen di `127.0.0.1`** (`HOSTNAME` di `ecosystem.config.js`); akses dari luar lewat nginx. Konfigurasi proxy-nya ada di [`deploy/nginx/synona.conf`](deploy/nginx/synona.conf) beserta perintah pemasangannya. Jangan ubah pm2 ke cluster mode atau `instances > 1` — SQLite satu penulis, akan kena `SQLITE_BUSY`.
 # synona

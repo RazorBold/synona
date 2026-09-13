@@ -12,6 +12,7 @@ export type ProdukPos = {
   gambar: string | null;
   harga: number;
   stok: number;
+  lacakStok: number;
   unit: string;
   batasStok: number;
   kategoriId: string | null;
@@ -26,6 +27,7 @@ export async function getProdukPos(outletId: string): Promise<ProdukPos[]> {
       gambar: products.imageUrl,
       harga: products.price,
       stok: products.stock,
+      lacakStok: products.lacakStok,
       unit: products.unit,
       batasStok: products.lowStockThreshold,
       kategoriId: products.categoryId,

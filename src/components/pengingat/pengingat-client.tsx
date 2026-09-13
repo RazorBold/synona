@@ -27,6 +27,7 @@ import type {
   BarisPengingat,
   JenisPengingat,
 } from "@/server/queries/pengingat";
+import { aman } from "@/lib/aksi";
 
 const GAYA: Record<
   JenisPengingat,
@@ -82,7 +83,7 @@ export function PengingatClient({
   async function segarkan() {
     setMenyegarkan(true);
     setPesan(null);
-    const r = await segarkanPengingat();
+    const r = await aman(segarkanPengingat());
     setMenyegarkan(false);
     setPesan(
       r.ok
@@ -93,7 +94,7 @@ export function PengingatClient({
 
   function ubah(id: string, status: "sent" | "dismissed" | "pending") {
     startTransition(async () => {
-      await ubahStatusPengingat({ id, status });
+      await aman(ubahStatusPengingat({ id, status }));
     });
   }
 

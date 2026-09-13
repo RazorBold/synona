@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { customers } from "@/db/schema";
 import { normalisasiNomorHp } from "@/lib/wa";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getRiwayatPelanggan } from "@/server/queries/pelanggan";
 
@@ -21,6 +22,7 @@ const PelangganInput = z.object({
 });
 
 export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = PelangganInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -103,6 +105,7 @@ export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
  * ke barisnya. Pelanggan yang masih punya utang tidak boleh diarsipkan.
  */
 export async function arsipkanPelanggan(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   try {
@@ -133,6 +136,7 @@ export async function arsipkanPelanggan(id: string): Promise<HasilAksi> {
 
 /** Riwayat belanja & utang satu pelanggan (dipakai di dialog detail). */
 export async function ambilRiwayatPelanggan(customerId: string) {
+  await wajibSesi();
   const outlet = await getOutletAktif();
   return getRiwayatPelanggan(outlet.id, customerId);
 }

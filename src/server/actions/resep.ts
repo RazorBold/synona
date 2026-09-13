@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { products, recipeItems } from "@/db/schema";
 import { hitungHppProduk } from "@/server/hpp";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 import { getResepProduk } from "@/server/queries/resep";
 
@@ -36,6 +37,7 @@ const ResepInput = z.object({
  * jalur perhitungan kedua yang bisa berbeda hasilnya.
  */
 export async function simpanResep(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = ResepInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -113,6 +115,7 @@ export async function simpanResep(input: unknown): Promise<HasilAksi> {
 }
 
 export async function ambilResep(productId: string) {
+  await wajibSesi();
   const outlet = await getOutletAktif();
   const milik = db
     .select({ id: products.id })

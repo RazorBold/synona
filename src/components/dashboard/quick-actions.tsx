@@ -1,26 +1,65 @@
 import {
   BarChart3,
+  ClipboardList,
   FileText,
   Package,
   ScanLine,
+  Scissors,
   ShoppingCart,
   UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 
-const AKSI = [
-  {
-    href: "/kasir",
-    label: "Penjualan\n(POS)",
-    icon: ShoppingCart,
-    kelas: "bg-brand-50 text-brand-500 hover:bg-brand-100",
-  },
-  {
-    href: "/produk/baru",
-    label: "Tambah\nProduk",
-    icon: Package,
-    kelas: "bg-emerald-50 text-emerald-500 hover:bg-emerald-100",
-  },
+import { punyaBarang, punyaJasa, type JenisUsaha } from "@/lib/usaha";
+
+type Aksi = {
+  href: string;
+  label: string;
+  icon: typeof ShoppingCart;
+  kelas: string;
+};
+
+/** Pintasan mengikuti jenis usaha — lihat src/lib/usaha.ts. */
+function susunAksi(jenis: JenisUsaha | null): Aksi[] {
+  const depan: Aksi[] = [];
+
+  if (punyaBarang(jenis)) {
+    depan.push({
+      href: "/kasir",
+      label: "Penjualan\n(POS)",
+      icon: ShoppingCart,
+      kelas: "bg-brand-50 text-brand-500 hover:bg-brand-100",
+    });
+  }
+  if (punyaJasa(jenis)) {
+    depan.push({
+      href: "/pesanan",
+      label: "Terima\nPesanan",
+      icon: ClipboardList,
+      kelas: "bg-brand-50 text-brand-500 hover:bg-brand-100",
+    });
+  }
+
+  depan.push(
+    punyaBarang(jenis)
+      ? {
+          href: "/produk/baru",
+          label: "Tambah\nProduk",
+          icon: Package,
+          kelas: "bg-emerald-50 text-emerald-500 hover:bg-emerald-100",
+        }
+      : {
+          href: "/layanan",
+          label: "Tambah\nLayanan",
+          icon: Scissors,
+          kelas: "bg-emerald-50 text-emerald-500 hover:bg-emerald-100",
+        },
+  );
+
+  return [...depan, ...AKSI_TETAP].slice(0, 6);
+}
+
+const AKSI_TETAP: Aksi[] = [
   {
     href: "/pelanggan/baru",
     label: "Tambah\nPelanggan",
@@ -47,7 +86,13 @@ const AKSI = [
   },
 ];
 
-export function QuickActions() {
+export function QuickActions({
+  jenisUsaha,
+}: {
+  jenisUsaha: JenisUsaha | null;
+}) {
+  const AKSI = susunAksi(jenisUsaha);
+
   return (
     <section className="card flex flex-col p-5">
       <h2 className="card-title text-[17px]">Aksi Cepat</h2>

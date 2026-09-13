@@ -2,24 +2,32 @@
 
 import { useState } from "react";
 
+import type { JenisUsaha } from "@/lib/usaha";
+
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 
 type Props = {
   namaPemilik: string;
+  peran: string;
   namaOutlet: string;
+  jenisUsaha: JenisUsaha;
   paket: string;
   berlakuSampai: string;
   jumlahNotifikasi: number;
+  waBantuan: string | null;
   children: React.ReactNode;
 };
 
 export function AppShell({
   namaPemilik,
+  peran,
   namaOutlet,
+  jenisUsaha,
   paket,
   berlakuSampai,
   jumlahNotifikasi,
+  waBantuan,
   children,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -35,8 +43,11 @@ export function AppShell({
 
       <Sidebar
         namaPemilik={namaPemilik}
+        peran={peran}
+        jenisUsaha={jenisUsaha}
         paket={paket}
         berlakuSampai={berlakuSampai}
+        waBantuan={waBantuan}
         open={open}
         onClose={() => setOpen(false)}
       />

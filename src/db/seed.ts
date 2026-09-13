@@ -48,14 +48,18 @@ for (const t of [
   "debt_payments",
   "debts",
   "stock_movements",
+  "service_orders",
   "transaction_items",
   "transactions",
   "reminders",
   "reconciliations",
   "products",
+  "services",
   "categories",
   "customers",
   "staff",
+  "cash_transfers",
+  "cash_accounts",
   "outlets",
   "users",
 ]) {
@@ -84,6 +88,8 @@ db.insert(schema.outlets)
     name: "Outlet Utama",
     address: "Jl. Merdeka No. 12, Bandung",
     phone: "6281234567890",
+    // Data demo ini toko sembako, jadi onboarding tidak perlu muncul lagi.
+    jenisUsaha: "dagang",
   })
   .run();
 
@@ -91,6 +97,27 @@ const staffId = nanoid();
 db.insert(schema.staff)
   .values({ id: staffId, outletId, userId, role: "owner" })
   .run();
+
+/* ----------------------------------------------------- kas & bank */
+
+const akunKas = [
+  { name: "Kas Laci", type: "kas" as const, metodeDefault: "cash" as const },
+  { name: "BCA Operasional", type: "bank" as const, metodeDefault: "transfer" as const },
+  { name: "QRIS", type: "ewallet" as const, metodeDefault: "qris" as const },
+].map((a, i) => ({
+  id: nanoid(),
+  outletId,
+  sortOrder: i,
+  bankName: a.type === "bank" ? "BCA" : null,
+  ...a,
+}));
+db.insert(schema.cashAccounts).values(akunKas).run();
+
+const akunMetode: Record<string, string> = {
+  cash: akunKas[0].id,
+  transfer: akunKas[1].id,
+  qris: akunKas[2].id,
+};
 
 /* -------------------------------------------------------- katalog */
 
@@ -324,6 +351,7 @@ for (let d = 6; d >= 0; d--) {
       discount: 0,
       total: subtotal,
       paymentMethod: metode,
+      cashAccountId: akunMetode[metode] ?? akunKas[0].id,
       paidAmount: subtotal,
       changeAmount: 0,
       status: "paid",

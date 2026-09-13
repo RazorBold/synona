@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { POLA_NAMA_GAMBAR } from "@/lib/gambar";
+import { sesiSaatIni } from "@/server/auth";
 
 // Membaca berkas dari disk — wajib runtime Node, bukan Edge.
 export const runtime = "nodejs";
@@ -19,6 +20,12 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ nama: string }> },
 ) {
+  // Foto produk ikut data usaha — middleware sudah menyaring, ini lapisan
+  // keduanya (middleware hanya melihat ada-tidaknya cookie).
+  if (!(await sesiSaatIni())) {
+    return new Response("Tidak terautentikasi", { status: 401 });
+  }
+
   const { nama } = await params;
 
   // Penjagaan path traversal: hanya nama hasil nanoid + ekstensi yang lolos.

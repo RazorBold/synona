@@ -15,6 +15,8 @@ import {
   transactions,
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
+import { wajibSesi } from "@/server/auth";
+import { pilihAkunKas } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 const ItemInput = z.object({
@@ -26,6 +28,7 @@ const TransaksiInput = z.object({
   items: z.array(ItemInput).min(1, "Keranjang masih kosong"),
   discount: z.number().int().min(0).default(0),
   paymentMethod: z.enum(["cash", "qris", "transfer", "debt"]),
+  akunKasId: z.string().nullable().default(null),
   paidAmount: z.number().int().min(0).default(0),
   customerId: z.string().nullable().default(null),
   dueDate: z
@@ -58,6 +61,7 @@ export type HasilTransaksi =
  *    dalam SATU db.transaction agar tidak ada stok berkurang tanpa penjualan.
  */
 export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
+  await wajibSesi();
   const parsed = TransaksiInput.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };
@@ -87,7 +91,9 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
       for (const item of data.items) {
         const p = byId.get(item.productId);
         if (!p) throw new Error("Ada produk yang tidak ditemukan di outlet ini");
-        if (p.stock < item.qty) {
+        // Produk tanpa lacak stok (mis. masak-saat-pesan) tidak pernah
+        // kehabisan — penjualannya tidak boleh diblokir angka stok.
+        if (p.lacakStok === 1 && p.stock < item.qty) {
           throw new Error(`Stok ${p.name} tinggal ${p.stock} ${p.unit}`);
         }
 
@@ -144,6 +150,16 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           discount,
           total,
           paymentMethod: data.paymentMethod,
+          // Utang belum menggerakkan uang; akunnya baru ditentukan saat
+          // cicilannya masuk.
+          cashAccountId: isUtang
+            ? null
+            : pilihAkunKas(
+                tx,
+                outlet.id,
+                data.akunKasId,
+                data.paymentMethod as "cash" | "qris" | "transfer",
+              ),
           paidAmount: dibayar,
           changeAmount: kembalian,
           status: isUtang ? "debt" : "paid",
@@ -157,9 +173,12 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
         .values(barisItem.map((b) => ({ ...b, transactionId: txId })))
         .run();
 
-      // Stok berkurang + jejak di buku besar stok.
+      // Stok berkurang + jejak di buku besar stok. Produk yang tidak dilacak
+      // dilewati sepenuhnya: tidak ada angka stok yang bermakna untuk dikurangi,
+      // dan buku besarnya akan penuh baris yang menyesatkan.
       for (const item of data.items) {
         const p = byId.get(item.productId)!;
+        if (p.lacakStok !== 1) continue;
         const stokBaru = p.stock - item.qty;
 
         tx.update(products)

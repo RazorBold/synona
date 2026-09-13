@@ -7,8 +7,9 @@ import { useEffect, useState } from "react";
 import { formatRupiah, persen } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ambilResep, simpanResep } from "@/server/actions/resep";
-import type { BarisBahan } from "@/server/queries/bahan";
+import type { BarisBahan } from "@/server/queries/persediaan";
 import type { BarisProduk } from "@/server/queries/produk";
+import { aman } from "@/lib/aksi";
 
 type Baris = { materialId: string; qty: number };
 
@@ -50,7 +51,10 @@ export function ResepDialog({
             : [],
       );
       setMuat(false);
-    });
+    })
+      // Gagal memuat riwayat tidak boleh meninggalkan dialog
+      // berputar selamanya — hentikan pemuatannya.
+      .catch(() => setMuat(false));
   }, [open, produk, bahan]);
 
   if (!produk) return null;
@@ -68,13 +72,13 @@ export function ResepDialog({
     setPending(true);
     setError(null);
 
-    const hasil = await simpanResep({
+    const hasil = await aman(simpanResep({
       productId: produk.id,
       mode,
       laborCost: labor,
       overheadCost: overhead,
       item: item.filter((i) => i.qty > 0),
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

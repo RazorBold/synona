@@ -6,9 +6,16 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { outlets, staff, users } from "@/db/schema";
+import { outlets, pengguna, staff, users } from "@/db/schema";
 import { PAKET, type Paket } from "@/lib/paket";
 import { normalisasiNomorHp } from "@/lib/wa";
+import {
+  buatSalt,
+  hashSandi,
+  periksaKekuatanSandi,
+  wajibSesi,
+} from "@/server/auth";
+import { buatAkunKasBawaan } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -27,6 +34,7 @@ const OutletInput = z.object({
  * di UI saja tidak cukup, karena Server Action bisa dipanggil langsung.
  */
 export async function simpanOutlet(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = OutletInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -86,8 +94,15 @@ export async function simpanOutlet(input: unknown): Promise<HasilAksi> {
           name: d.nama,
           address: d.alamat,
           phone: d.telepon ? normalisasiNomorHp(d.telepon) : null,
+          // Cabang baru mengikuti jenis usaha yang sudah dipilih — kalau
+          // dibiarkan kosong, membuka cabang justru melempar pemilik kembali
+          // ke layar onboarding.
+          jenisUsaha: aktif.jenisUsaha,
         })
         .run();
+
+      // Outlet baru langsung punya kas, bank, dan QRIS — lihat src/server/kas.ts.
+      buatAkunKasBawaan(tx as never, id);
 
       // Pemilik otomatis jadi staf di outlet barunya.
       tx.insert(staff)
@@ -115,13 +130,39 @@ const StafInput = z.object({
   email: z.string().trim().email("Email tidak valid").max(120),
   telepon: z.string().trim().max(24).nullable().default(null),
   peran: z.enum(["owner", "kasir"]),
+  /**
+   * Kredensial masuk. Keduanya OPSIONAL: staf boleh dicatat hanya sebagai
+   * nama untuk atribusi transaksi, tanpa diberi akses aplikasi. Kalau diisi,
+   * barulah akun `pengguna` dibuat — inilah jalur yang menyatukan halaman ini
+   * dengan /register, yang membuat akun dengan cara yang sama.
+   */
+  namaPengguna: z
+    .string()
+    .trim()
+    .max(64)
+    .regex(
+      /^[a-z0-9._-]*$/i,
+      "Nama pengguna hanya boleh huruf, angka, titik, garis bawah, dan strip",
+    )
+    .nullable()
+    .default(null),
+  sandi: z.string().max(200).nullable().default(null),
 });
 
 /**
- * Menambah staf. Karena autentikasi belum terpasang (langkah 5), baris `users`
- * dibuat tanpa kata sandi — nanti tinggal ditautkan ke Auth.js lewat email.
+ * Menambah atau mengubah staf, sekalian akun masuknya.
+ *
+ * Dulu fungsi ini hanya menulis `users` + `staff`, sementara autentikasi
+ * hidup di tabel `pengguna` yang terpisah — akibatnya staf yang ditambahkan
+ * di sini TIDAK PERNAH bisa masuk. Sekarang keduanya ditulis bersama lewat
+ * `pengguna.user_id`, memakai fungsi hash yang sama dengan /register.
+ *
+ * Sandi yang diberikan pemilik selalu ditandai `harusGantiSandi` — pemilik
+ * mengetahui sandi awal itu, jadi ia harus berhenti berlaku begitu stafnya
+ * masuk pertama kali (ditegakkan di src/app/(app)/layout.tsx).
  */
 export async function simpanStaf(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = StafInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -132,6 +173,31 @@ export async function simpanStaf(input: unknown): Promise<HasilAksi> {
   const d = parsed.data;
   const aktif = await getOutletAktif();
   const telepon = d.telepon ? normalisasiNomorHp(d.telepon) : null;
+
+  const namaPengguna = d.namaPengguna?.trim().toLowerCase() || null;
+  const sandi = d.sandi?.trim() || null;
+
+  if (sandi && !namaPengguna) {
+    return { ok: false, error: "Isi juga nama penggunanya supaya staf bisa masuk" };
+  }
+  if (namaPengguna && namaPengguna.length < 3) {
+    return { ok: false, error: "Nama pengguna minimal 3 huruf" };
+  }
+  // Akun baru wajib punya sandi; pada mode ubah, sandi kosong berarti
+  // "biarkan sandi yang sekarang".
+  if (namaPengguna && !d.id && !sandi) {
+    return { ok: false, error: "Isi sandi awal untuk staf ini" };
+  }
+  if (sandi) {
+    const lemah = periksaKekuatanSandi(sandi);
+    if (lemah) return { ok: false, error: lemah };
+  }
+
+  // scrypt async, sementara transaksi better-sqlite3 sinkron — hash dulu di
+  // luar, sama seperti di daftar().
+  const salt = sandi ? buatSalt() : null;
+  const hash = sandi && salt ? await hashSandi(sandi, salt) : null;
+  const peranAkun = d.peran === "owner" ? "pemilik" : "kasir";
 
   try {
     db.transaction((tx) => {
@@ -155,14 +221,30 @@ export async function simpanStaf(input: unknown): Promise<HasilAksi> {
       if (!milik) throw new Error("Outlet tidak ditemukan");
 
       if (d.id) {
+        const barisStaf = tx
+          .select({ userId: staff.userId })
+          .from(staff)
+          .where(eq(staff.id, d.id))
+          .get();
+        if (!barisStaf) throw new Error("Staf tidak ditemukan");
+
         tx.update(staff)
           .set({ role: d.peran })
           .where(eq(staff.id, d.id))
           .run();
         tx.run(
           sql`UPDATE users SET name = ${d.nama}, phone = ${telepon}
-               WHERE id = (SELECT user_id FROM staff WHERE id = ${d.id})`,
+               WHERE id = ${barisStaf.userId}`,
         );
+
+        sinkronkanAkun(tx, {
+          userId: barisStaf.userId,
+          nama: d.nama,
+          namaPengguna,
+          peranAkun,
+          hash,
+          salt,
+        });
         return;
       }
 
@@ -215,6 +297,15 @@ export async function simpanStaf(input: unknown): Promise<HasilAksi> {
           role: d.peran,
         })
         .run();
+
+      sinkronkanAkun(tx, {
+        userId,
+        nama: d.nama,
+        namaPengguna,
+        peranAkun,
+        hash,
+        salt,
+      });
     });
   } catch (e) {
     return { ok: false, error: pesan(e) };
@@ -224,8 +315,87 @@ export async function simpanStaf(input: unknown): Promise<HasilAksi> {
   return { ok: true };
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Menyelaraskan akun masuk milik satu orang dengan data stafnya.
+ *
+ * Tidak melakukan apa pun kalau nama pengguna dikosongkan — itu cara pemilik
+ * mencatat staf yang tidak diberi akses aplikasi. Begitu diisi, akunnya
+ * dibuat (atau disegarkan) dan langsung terikat lewat `pengguna.user_id`.
+ */
+function sinkronkanAkun(
+  tx: Tx,
+  a: {
+    userId: string;
+    nama: string;
+    namaPengguna: string | null;
+    peranAkun: "pemilik" | "kasir";
+    hash: string | null;
+    salt: string | null;
+  },
+): void {
+  if (!a.namaPengguna) return;
+
+  const punya = tx
+    .select({ id: pengguna.id })
+    .from(pengguna)
+    .where(eq(pengguna.userId, a.userId))
+    .get();
+
+  // Nama pengguna itu unik se-aplikasi, jadi bentrokannya dicek terhadap
+  // SEMUA akun, bukan cuma staf outlet ini.
+  const dipakaiOrangLain = tx
+    .select({ id: pengguna.id })
+    .from(pengguna)
+    .where(eq(pengguna.namaPengguna, a.namaPengguna))
+    .get();
+  if (dipakaiOrangLain && dipakaiOrangLain.id !== punya?.id) {
+    throw new Error(`Nama pengguna "${a.namaPengguna}" sudah dipakai akun lain`);
+  }
+
+  if (punya) {
+    tx.update(pengguna)
+      .set({
+        nama: a.nama,
+        namaPengguna: a.namaPengguna,
+        peran: a.peranAkun,
+        // Menyimpan staf lewat dialog ini berarti pemilik menghendaki orang
+        // itu aktif kembali kalau sebelumnya dinonaktifkan.
+        aktif: 1,
+        // Sandi hanya disentuh kalau kolomnya memang diisi.
+        ...(a.hash && a.salt
+          ? { hashSandi: a.hash, salt: a.salt, harusGantiSandi: 1 }
+          : {}),
+      })
+      .where(eq(pengguna.id, punya.id))
+      .run();
+    return;
+  }
+
+  if (!a.hash || !a.salt) {
+    throw new Error("Isi sandi awal untuk membuatkan akun masuk staf ini");
+  }
+
+  tx.insert(pengguna)
+    .values({
+      id: nanoid(),
+      nama: a.nama,
+      namaPengguna: a.namaPengguna,
+      hashSandi: a.hash,
+      salt: a.salt,
+      peran: a.peranAkun,
+      userId: a.userId,
+      // Sandi awal ini diketahui pemilik, jadi wajib diganti saat staf
+      // pertama kali masuk — ditegakkan di src/app/(app)/layout.tsx.
+      harusGantiSandi: 1,
+    })
+    .run();
+}
+
 /** Staf dinonaktifkan, bukan dihapus — transaksi lama menunjuk ke barisnya. */
 export async function nonaktifkanStaf(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const aktif = await getOutletAktif();
 
   try {
@@ -244,6 +414,16 @@ export async function nonaktifkanStaf(id: string): Promise<HasilAksi> {
         .set({ isActive: 0 })
         .where(eq(staff.id, id))
         .run();
+
+      /**
+       * Akses masuknya ikut dicabut. Kalau hanya baris `staff` yang dimatikan,
+       * mantan kasir tetap bisa login dan membuka seluruh aplikasi — sesi JWT
+       * tidak punya daftar pencabutan, jadi penjagaannya harus di sini.
+       */
+      tx.update(pengguna)
+        .set({ aktif: 0 })
+        .where(eq(pengguna.userId, s.userId))
+        .run();
     });
   } catch (e) {
     return { ok: false, error: pesan(e) };
@@ -259,6 +439,7 @@ const ProfilInput = z.object({
 });
 
 export async function simpanProfilPemilik(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = ProfilInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -292,4 +473,38 @@ function pesan(e: unknown): string {
     return "Email itu sudah dipakai pengguna lain";
   }
   return p;
+}
+
+const JenisUsahaInput = z.object({
+  jenis: z.enum(["dagang", "jasa", "campuran"]),
+});
+
+/**
+ * Menyimpan jenis usaha. Dipakai layar penyiapan dan Pengaturan → Outlet.
+ * Pilihan pada halaman masuk memakai jalur lain (lihat `masuk()`), karena di
+ * sana penggunanya belum punya sesi.
+ *
+ * Menggantinya tidak menghapus apa pun: menu yang disembunyikan hanya
+ * disembunyikan. Pemilik yang tadinya "jasa" lalu pindah ke "campuran" akan
+ * menemukan katalog produknya utuh seperti sebelumnya.
+ */
+export async function simpanJenisUsaha(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
+  const parsed = JenisUsahaInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Pilih dulu jenis usahanya" };
+  }
+  const aktif = await getOutletAktif();
+
+  try {
+    db.update(outlets)
+      .set({ jenisUsaha: parsed.data.jenis })
+      .where(eq(outlets.id, aktif.id))
+      .run();
+  } catch (e) {
+    return { ok: false, error: pesan(e) };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

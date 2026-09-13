@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
+import { wajibSesi } from "@/server/auth";
+import { pilihAkunKas } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -24,12 +26,14 @@ const BebanInput = z.object({
   nama: z.string().trim().min(2, "Nama beban minimal 2 huruf").max(80),
   jumlah: z.coerce.number().int().positive("Jumlah beban harus lebih dari 0"),
   metode: z.enum(["cash", "qris", "transfer", "other"]).default("cash"),
+  akunKasId: z.string().nullable().default(null),
   berulang: z.boolean().default(false),
   tanggal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
   catatan: z.string().trim().max(200).nullable().default(null),
 });
 
 export async function simpanBeban(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = BebanInput.safeParse(input);
   if (!parsed.success) {
     return {
@@ -55,6 +59,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
           name: d.nama,
           amount: d.jumlah,
           method: d.metode,
+          cashAccountId: pilihAkunKas(db, outlet.id, d.akunKasId, d.metode),
           berulang: d.berulang ? 1 : 0,
           businessDate: d.tanggal,
           note: d.catatan,
@@ -70,6 +75,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
           name: d.nama,
           amount: d.jumlah,
           method: d.metode,
+          cashAccountId: pilihAkunKas(db, outlet.id, d.akunKasId, d.metode),
           berulang: d.berulang ? 1 : 0,
           occurredAt: Date.now(),
           businessDate: d.tanggal,
@@ -86,6 +92,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
   }
 
   revalidatePath("/beban");
+  revalidatePath("/kas");
   revalidatePath("/");
   return { ok: true };
 }
@@ -96,6 +103,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
  * membuat "jurnal koreksi" bertentangan dengan prinsip bahasa sehari-hari.
  */
 export async function hapusBeban(id: string): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
 
   try {

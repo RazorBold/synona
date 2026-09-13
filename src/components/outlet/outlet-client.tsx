@@ -18,24 +18,33 @@ import { AvatarInisial } from "@/components/ui/avatar-inisial";
 import { IconButton } from "@/components/ui/icon-button";
 import { formatRupiah } from "@/lib/money";
 import { PAKET, type Paket } from "@/lib/paket";
+import {
+  JENIS_USAHA,
+  LABEL_JENIS_USAHA,
+  type JenisUsaha,
+} from "@/lib/usaha";
 import { cn } from "@/lib/utils";
 import {
   nonaktifkanStaf,
+  simpanJenisUsaha,
   simpanOutlet,
   simpanProfilPemilik,
   simpanStaf,
 } from "@/server/actions/outlet";
 import type { BarisOutlet, BarisStaf } from "@/server/queries/outlet";
+import { aman } from "@/lib/aksi";
 
 export function OutletClient({
   outlet,
   staf,
   pemilik,
+  jenisUsaha,
   berlakuSampai,
 }: {
   outlet: BarisOutlet[];
   staf: BarisStaf[];
   pemilik: { id: string; nama: string; email: string; telepon: string | null; paket: Paket };
+  jenisUsaha: JenisUsaha | null;
   berlakuSampai: string;
 }) {
   const batas = PAKET[pemilik.paket];
@@ -48,10 +57,25 @@ export function OutletClient({
   const [profilOpen, setProfilOpen] = useState(false);
   const [pilihOutlet, setPilihOutlet] = useState<BarisOutlet | null>(null);
   const [pilihStaf, setPilihStaf] = useState<BarisStaf | null>(null);
+  const [gantiPending, setGantiPending] = useState<JenisUsaha | null>(null);
+
+  async function gantiJenis(jenis: JenisUsaha) {
+    if (
+      !confirm(
+        `Ubah jenis usaha menjadi "${LABEL_JENIS_USAHA[jenis]}"? Menu akan menyesuaikan; data yang sudah ada tetap tersimpan.`,
+      )
+    )
+      return;
+
+    setGantiPending(jenis);
+    const hasil = await aman(simpanJenisUsaha({ jenis }));
+    setGantiPending(null);
+    if (!hasil.ok) alert(hasil.error);
+  }
 
   async function nonaktifkan(s: BarisStaf) {
     if (!confirm(`Nonaktifkan ${s.nama} dari ${s.namaOutlet}?`)) return;
-    const hasil = await nonaktifkanStaf(s.id);
+    const hasil = await aman(nonaktifkanStaf(s.id));
     if (!hasil.ok) alert(hasil.error);
   }
 
@@ -90,6 +114,45 @@ export function OutletClient({
           </button>
         </div>
       </div>
+
+      {/* Jenis usaha — menentukan menu yang tampil */}
+      <section className="card min-w-0 p-5">
+        <h2 className="card-title text-[17px]">Jenis Usaha</h2>
+        <p className="mt-1 text-sm text-muted">
+          Menentukan menu mana yang muncul. Menggantinya tidak menghapus data
+          apa pun — menu yang disembunyikan hanya disembunyikan.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {JENIS_USAHA.map((j) => {
+            const aktif = jenisUsaha === j.key;
+            return (
+              <button
+                key={j.key}
+                onClick={() => gantiJenis(j.key)}
+                disabled={aktif || gantiPending !== null}
+                className={cn(
+                  "rounded-2xl border p-4 text-left transition-colors disabled:cursor-default",
+                  aktif
+                    ? "border-brand-300 bg-brand-50"
+                    : "border-line bg-white hover:border-brand-200",
+                )}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="text-xl">{j.emoji}</span>
+                  <span className="text-sm font-bold text-ink">{j.label}</span>
+                  {gantiPending === j.key && (
+                    <Loader2 className="size-3.5 animate-spin text-muted" />
+                  )}
+                </span>
+                <span className="mt-1.5 block text-xs text-muted">
+                  {j.ringkas}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Paket langganan */}
       <section className="card overflow-hidden">
@@ -193,7 +256,20 @@ export function OutletClient({
                   )}
                 </p>
                 <p className="truncate text-xs text-muted">
-                  {s.email} · {s.namaOutlet}
+                  {s.namaOutlet} ·{" "}
+                  {s.namaPengguna ? (
+                    <>
+                      masuk sebagai{" "}
+                      <span className="font-semibold text-ink-soft">
+                        {s.namaPengguna}
+                      </span>
+                      {s.akunAktif === 0 && " (dicabut)"}
+                    </>
+                  ) : (
+                    <span className="font-semibold text-amber-600">
+                      belum bisa masuk
+                    </span>
+                  )}
                 </p>
               </div>
               <span
@@ -364,12 +440,12 @@ function OutletDialog({
   async function simpan() {
     setPending(true);
     setError(null);
-    const hasil = await simpanOutlet({
+    const hasil = await aman(simpanOutlet({
       id: outlet?.id ?? null,
       nama,
       alamat: alamat.trim() || null,
       telepon: telepon.trim() || null,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);
@@ -440,8 +516,14 @@ function StafDialog({
   const [telepon, setTelepon] = useState("");
   const [peran, setPeran] = useState<"owner" | "kasir">("kasir");
   const [outletId, setOutletId] = useState("");
+  const [namaPengguna, setNamaPengguna] = useState("");
+  const [sandi, setSandi] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Staf lama yang belum punya akun masuk sama sekali — dialognya menawarkan
+  // pembuatan akun, bukan sekadar penggantian sandi.
+  const sudahPunyaAkun = Boolean(staf?.namaPengguna);
 
   useEffect(() => {
     if (!open) return;
@@ -450,20 +532,24 @@ function StafDialog({
     setTelepon(staf?.telepon ?? "");
     setPeran(staf?.peran ?? "kasir");
     setOutletId(staf?.outletId ?? daftarOutlet[0]?.id ?? "");
+    setNamaPengguna(staf?.namaPengguna ?? "");
+    setSandi("");
     setError(null);
   }, [open, staf, daftarOutlet]);
 
   async function simpan() {
     setPending(true);
     setError(null);
-    const hasil = await simpanStaf({
+    const hasil = await aman(simpanStaf({
       id: staf?.id ?? null,
       outletId,
       nama,
       email,
       telepon: telepon.trim() || null,
       peran,
-    });
+      namaPengguna: namaPengguna.trim() || null,
+      sandi: sandi || null,
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);
@@ -541,6 +627,52 @@ function StafDialog({
               </select>
             </div>
           </div>
+
+          <div className="border-t border-line pt-4">
+            <p className="text-sm font-semibold text-ink">Akses masuk</p>
+            <p className="mt-0.5 text-xs text-muted">
+              {sudahPunyaAkun
+                ? "Kosongkan sandi kalau tidak ingin menggantinya."
+                : "Isi kalau staf ini perlu bisa membuka aplikasi. Biarkan kosong untuk mencatat namanya saja."}
+            </p>
+
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-sm font-semibold text-ink">
+                  Nama pengguna
+                </label>
+                <input
+                  value={namaPengguna}
+                  onChange={(e) => setNamaPengguna(e.target.value)}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="mis. budi.kasir"
+                  className={inputKelas}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-ink">
+                  {sudahPunyaAkun ? "Sandi baru" : "Sandi awal"}{" "}
+                  <span className="font-normal text-muted">(min. 8)</span>
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={sandi}
+                  onChange={(e) => setSandi(e.target.value)}
+                  placeholder={sudahPunyaAkun ? "biarkan kosong" : ""}
+                  className={inputKelas}
+                />
+              </div>
+            </div>
+
+            {namaPengguna.trim() && (
+              <p className="mt-3 rounded-xl bg-amber-50 px-4 py-2.5 text-xs text-ink-soft">
+                Staf akan diminta mengganti sandi ini sendiri saat pertama kali
+                masuk.
+              </p>
+            )}
+          </div>
         </Bingkai>
       </Dialog.Portal>
     </Dialog.Root>
@@ -571,10 +703,10 @@ function ProfilDialog({
   async function simpan() {
     setPending(true);
     setError(null);
-    const hasil = await simpanProfilPemilik({
+    const hasil = await aman(simpanProfilPemilik({
       nama,
       telepon: telepon.trim() || null,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);

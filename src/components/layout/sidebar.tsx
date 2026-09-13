@@ -2,16 +2,20 @@
 
 import {
   ChefHat,
-  ChevronDown,
   ChevronRight,
+  ClipboardList,
   Clock,
   Crown,
   FileText,
   Home,
+  Landmark,
+  LogOut,
   MessageCircleQuestion,
   Package,
   PiggyBank,
   ReceiptText,
+  Scissors,
+  ShoppingCart,
   Store,
   Users,
   Wallet,
@@ -23,58 +27,94 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { WhatsAppIcon } from "@/components/icons/whatsapp";
+import { punyaBarang, punyaJasa, type JenisUsaha } from "@/lib/usaha";
 import { cn } from "@/lib/utils";
+import { keluar } from "@/server/actions/auth";
+import { LogoSynona } from "@/components/ui/logo-synona";
 
-const NAV: { judul: string; item: { href: string; label: string; icon: typeof Home }[] }[] = [
-  {
-    judul: "Pencatatan",
-    item: [
-      { href: "/kasir", label: "Penjualan (POS)", icon: ReceiptText },
+type ItemNavData = { href: string; label: string; icon: typeof Home };
+type Grup = { judul: string; item: ItemNavData[] };
+
+/**
+ * Menu disusun ulang menurut jenis usaha, bukan disembunyikan dengan CSS —
+ * pemilik salon tidak perlu tahu bahwa "Produksi" pernah ada.
+ */
+function susunNav(jenis: JenisUsaha): Grup[] {
+  const barang = punyaBarang(jenis);
+  const jasa = punyaJasa(jenis);
+
+  const pencatatan: ItemNavData[] = [];
+  // POS hanya berarti kalau ada barang untuk dijual di tempat. Usaha jasa
+  // murni menutup semua penjualannya lewat papan pesanan.
+  if (barang) {
+    pencatatan.push({ href: "/kasir", label: "Penjualan (POS)", icon: ReceiptText });
+  }
+  if (jasa) {
+    pencatatan.push({ href: "/pesanan", label: "Pesanan Jasa", icon: ClipboardList });
+  }
+  if (barang) {
+    pencatatan.push(
       { href: "/produksi", label: "Produksi", icon: ChefHat },
-      { href: "/bahan", label: "Bahan Baku", icon: Wheat },
-      { href: "/beban", label: "Beban & Tagihan", icon: Wallet },
-    ],
-  },
-  {
-    judul: "Data Usaha",
-    item: [
-      { href: "/produk", label: "Produk & Stok", icon: Package },
-      { href: "/pelanggan", label: "Pelanggan", icon: Users },
-      { href: "/kasbon", label: "Utang (Kasbon)", icon: WalletCards },
-    ],
-  },
-  {
-    judul: "Analisa",
-    item: [
-      { href: "/laporan", label: "Laporan", icon: FileText },
-      { href: "/rekonsiliasi", label: "Kas & Rekonsiliasi", icon: PiggyBank },
-    ],
-  },
-  {
-    judul: "Pengaturan",
-    item: [
-      { href: "/outlet", label: "Outlet & Staf", icon: Store },
-      { href: "/pengingat", label: "Pengingat", icon: Clock },
-    ],
-  },
-];
+      { href: "/pembelian", label: "Pembelian Stok", icon: ShoppingCart },
+      { href: "/persediaan", label: "Persediaan", icon: Wheat },
+    );
+  }
+  pencatatan.push({ href: "/beban", label: "Beban & Tagihan", icon: Wallet });
+
+  const dataUsaha: ItemNavData[] = [];
+  if (jasa) dataUsaha.push({ href: "/layanan", label: "Layanan", icon: Scissors });
+  if (barang) {
+    dataUsaha.push({ href: "/produk", label: "Produk & Stok", icon: Package });
+  }
+  dataUsaha.push(
+    { href: "/pelanggan", label: "Pelanggan", icon: Users },
+    { href: "/kasbon", label: "Utang (Kasbon)", icon: WalletCards },
+  );
+
+  return [
+    { judul: "Pencatatan", item: pencatatan },
+    { judul: "Data Usaha", item: dataUsaha },
+    {
+      judul: "Analisa",
+      item: [
+        { href: "/laporan", label: "Laporan", icon: FileText },
+        { href: "/kas", label: "Kas & Bank", icon: Landmark },
+        { href: "/rekonsiliasi", label: "Rekonsiliasi Harian", icon: PiggyBank },
+      ],
+    },
+    {
+      judul: "Pengaturan",
+      item: [
+        { href: "/outlet", label: "Outlet & Staf", icon: Store },
+        { href: "/pengingat", label: "Pengingat", icon: Clock },
+      ],
+    },
+  ];
+}
 
 type Props = {
   namaPemilik: string;
+  peran: string;
+  jenisUsaha: JenisUsaha;
   paket: string;
   berlakuSampai: string;
+  waBantuan: string | null;
   open: boolean;
   onClose: () => void;
 };
 
 export function Sidebar({
   namaPemilik,
+  peran,
+  jenisUsaha,
   paket,
   berlakuSampai,
+  waBantuan,
   open,
   onClose,
 }: Props) {
   const pathname = usePathname();
+  const nav = susunNav(jenisUsaha);
 
   return (
     <>
@@ -125,9 +165,7 @@ export function Sidebar({
         {/* Logo */}
         <div className="relative px-6 pb-5 pt-6">
           <Link href="/" className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-pop">
-              <Store className="size-5 text-white" />
-            </span>
+            <LogoSynona tinggi={40} prioritas />
             <span className="text-2xl font-extrabold tracking-tight text-ink">
               Synona
             </span>
@@ -151,7 +189,7 @@ export function Sidebar({
             </li>
           </ul>
 
-          {NAV.map((grup) => (
+          {nav.map((grup) => (
             <div key={grup.judul} className="mt-4">
               <p className="px-3.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">
                 {grup.judul}
@@ -163,7 +201,7 @@ export function Sidebar({
                       href={href}
                       label={label}
                       icon={icon}
-                      aktif={pathname.startsWith(href)}
+                      aktif={pathname === href || pathname.startsWith(`${href}/`)}
                       onClose={onClose}
                     />
                   </li>
@@ -188,50 +226,67 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* Kartu bantuan */}
-          <div className="mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
-                <MessageCircleQuestion className="size-[18px]" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-ink">Butuh bantuan?</p>
-                <p className="text-xs text-muted">Chat via WhatsApp</p>
+          {/* Kartu bantuan — hanya kalau nomornya sudah dikonfigurasi */}
+          {waBantuan && (
+            <div className="mt-4 rounded-2xl border border-line bg-white p-4 shadow-card">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-500">
+                  <MessageCircleQuestion className="size-[18px]" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-ink">Butuh bantuan?</p>
+                  <p className="text-xs text-muted">Chat via WhatsApp</p>
+                </div>
               </div>
+              <a
+                href={`https://wa.me/${waBantuan}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-line bg-white py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-canvas"
+              >
+                Hubungi Kami
+                <span className="grid size-6 place-items-center rounded-full bg-success text-white">
+                  <WhatsAppIcon className="size-3.5" />
+                </span>
+              </a>
             </div>
-            <a
-              href="https://wa.me/6281234567890"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-line bg-white py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-canvas"
-            >
-              Hubungi Kami
-              <span className="grid size-6 place-items-center rounded-full bg-success text-white">
-                <WhatsAppIcon className="size-3.5" />
-              </span>
-            </a>
-          </div>
+          )}
         </nav>
 
-        {/* Profil pemilik */}
+        {/* Profil pengguna yang sedang masuk */}
         <div className="relative border-t border-line/70 px-4 py-3">
-          <button className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/60">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[13px] font-bold text-white">
+          <div className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left">
+            <Link
+              href="/ganti-sandi"
+              onClick={onClose}
+              aria-label="Ganti sandi"
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[13px] font-bold text-white"
+            >
               {namaPemilik
                 .split(" ")
                 .slice(0, 2)
                 .map((w) => w[0])
                 .join("")
                 .toUpperCase()}
-            </span>
+            </Link>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-bold text-ink">
                 {namaPemilik}
               </span>
-              <span className="block text-xs text-muted">Pemilik</span>
+              <span className="block text-xs text-muted">{peran}</span>
             </span>
-            <ChevronDown className="size-4 shrink-0 text-muted" />
-          </button>
+            {/* <form action={...}> supaya keluar tetap jalan tanpa JavaScript. */}
+            <form action={keluar}>
+              <button
+                type="submit"
+                aria-label="Keluar"
+                title="Keluar"
+                className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-canvas hover:text-danger"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </form>
+          </div>
         </div>
       </aside>
     </>

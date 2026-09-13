@@ -23,6 +23,7 @@ import type {
   KebutuhanBahan,
   ProdukProduksi,
 } from "@/server/queries/produksi";
+import { aman } from "@/lib/aksi";
 
 export function ProduksiClient({
   produk,
@@ -194,7 +195,9 @@ function ProduksiDialog({
     setCatatan("");
     setError(null);
     setBahan([]);
-    void ambilKebutuhanBahan(produk.id).then(setBahan);
+    void ambilKebutuhanBahan(produk.id)
+      .then(setBahan)
+      .catch(() => setBahan([]));
   }, [open, produk]);
 
   if (!produk) return null;
@@ -205,11 +208,11 @@ function ProduksiDialog({
     if (!produk) return;
     setPending(true);
     setError(null);
-    const hasil = await catatProduksi({
+    const hasil = await aman(catatProduksi({
       productId: produk.id,
       qty,
       catatan: catatan.trim() || null,
-    });
+    }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
     onOpenChange(false);

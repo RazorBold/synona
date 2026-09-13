@@ -18,6 +18,7 @@ import type {
   BarisRekonsiliasi,
   RingkasanKas,
 } from "@/server/queries/rekonsiliasi";
+import { aman } from "@/lib/aksi";
 
 /** MDR QRIS ±0,3% dipotong dari settlement, jadi selisih segitu masih wajar. */
 const MDR = 0.003;
@@ -65,12 +66,12 @@ export function RekonsiliasiClient({
     setError(null);
     setSukses(false);
 
-    const hasil = await simpanRekonsiliasi({
+    const hasil = await aman(simpanRekonsiliasi({
       tanggal,
       kasFisik,
       qrisSettled,
       catatan: catatan.trim() || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);

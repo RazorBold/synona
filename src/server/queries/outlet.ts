@@ -48,6 +48,10 @@ export type BarisStaf = {
   outletId: string;
   namaOutlet: string;
   transaksiBulanIni: number;
+  /** Nama pengguna untuk masuk, atau NULL kalau staf ini belum diberi akses. */
+  namaPengguna: string | null;
+  /** 1 kalau akunnya ada dan masih boleh dipakai masuk. */
+  akunAktif: number | null;
 };
 
 export async function getDaftarStaf(
@@ -58,12 +62,14 @@ export async function getDaftarStaf(
     SELECT s.id AS id, u.id AS userId, u.name AS nama, u.email AS email,
            u.phone AS telepon, s.role AS peran, s.is_active AS aktif,
            o.id AS outletId, o.name AS namaOutlet,
+           p.nama_pengguna AS namaPengguna, p.aktif AS akunAktif,
            COALESCE((SELECT COUNT(*) FROM transactions t
                       WHERE t.staff_id = s.id
                         AND substr(t.business_date, 1, 7) = ${bulan}), 0) AS transaksiBulanIni
       FROM staff s
       JOIN users u ON u.id = s.user_id
       JOIN outlets o ON o.id = s.outlet_id
+      LEFT JOIN pengguna p ON p.user_id = u.id
      WHERE o.owner_id = ${ownerId}
      ORDER BY s.role, u.name COLLATE NOCASE
   `);

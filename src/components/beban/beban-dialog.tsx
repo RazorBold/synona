@@ -8,7 +8,10 @@ import { businessDate } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { simpanBeban } from "@/server/actions/beban";
+import type { AkunKas } from "@/server/queries/kas";
 import type { BarisBeban, KategoriBeban } from "@/server/queries/beban";
+import { aman } from "@/lib/aksi";
+import { metodeAkun } from "@/lib/kas";
 
 export const KATEGORI: { key: KategoriBeban; label: string; emoji: string }[] = [
   { key: "listrik", label: "Listrik & Air", emoji: "💡" },
@@ -19,30 +22,23 @@ export const KATEGORI: { key: KategoriBeban; label: string; emoji: string }[] = 
   { key: "lainnya", label: "Lainnya", emoji: "📦" },
 ];
 
-const METODE: { key: "cash" | "qris" | "transfer" | "other"; label: string }[] = [
-  { key: "cash", label: "Tunai" },
-  { key: "qris", label: "QRIS" },
-  { key: "transfer", label: "Transfer" },
-  { key: "other", label: "Lainnya" },
-];
-
 export function BebanDialog({
   open,
   onOpenChange,
   beban,
+  akun,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   beban: BarisBeban | null;
+  akun: AkunKas[];
 }) {
   const edit = Boolean(beban);
 
   const [kategori, setKategori] = useState<KategoriBeban>("listrik");
   const [nama, setNama] = useState("");
   const [jumlah, setJumlah] = useState(0);
-  const [metode, setMetode] = useState<"cash" | "qris" | "transfer" | "other">(
-    "cash",
-  );
+  const [akunKasId, setAkunKasId] = useState("");
   const [berulang, setBerulang] = useState(false);
   const [tanggal, setTanggal] = useState(() => businessDate());
   const [catatan, setCatatan] = useState("");
@@ -54,29 +50,28 @@ export function BebanDialog({
     setKategori(beban?.kategori ?? "listrik");
     setNama(beban?.nama ?? "");
     setJumlah(beban?.jumlah ?? 0);
-    setMetode(
-      (beban?.metode as "cash" | "qris" | "transfer" | "other") ?? "cash",
-    );
+    setAkunKasId(beban?.akunKasId ?? akun[0]?.id ?? "");
     setBerulang(Boolean(beban?.berulang));
     setTanggal(beban?.tanggal ?? businessDate());
     setCatatan(beban?.catatan ?? "");
     setError(null);
-  }, [open, beban]);
+  }, [open, beban, akun]);
 
   async function simpan() {
     setPending(true);
     setError(null);
 
-    const hasil = await simpanBeban({
+    const hasil = await aman(simpanBeban({
       id: beban?.id ?? null,
       kategori,
       nama,
       jumlah,
-      metode,
+      metode: metodeAkun(akun.find((a) => a.id === akunKasId)?.jenis),
+      akunKasId: akunKasId || null,
       berulang,
       tanggal,
       catatan: catatan.trim() || null,
-    });
+    }));
 
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
@@ -176,20 +171,16 @@ export function BebanDialog({
               </div>
               <div>
                 <label className="text-sm font-semibold text-ink">
-                  Dibayar lewat
+                  Uangnya diambil dari
                 </label>
                 <select
-                  value={metode}
-                  onChange={(e) =>
-                    setMetode(
-                      e.target.value as "cash" | "qris" | "transfer" | "other",
-                    )
-                  }
+                  value={akunKasId}
+                  onChange={(e) => setAkunKasId(e.target.value)}
                   className={inputKelas}
                 >
-                  {METODE.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.label}
+                  {akun.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.nama}
                     </option>
                   ))}
                 </select>

@@ -5,7 +5,7 @@ import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { GambarProduk } from "@/components/ui/gambar-produk";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { hitungJumlahItem, hitungSubtotal, useCart } from "@/store/cart";
+import { hitungJumlahItem, hitungSubtotal, batasQty, useCart } from "@/store/cart";
 
 export function CartPanel({
   onBayar,
@@ -99,7 +99,7 @@ export function CartPanel({
                   </span>
                   <button
                     onClick={() => setQty(i.id, i.qty + 1)}
-                    disabled={i.qty >= i.stok}
+                    disabled={i.qty >= batasQty(i)}
                     aria-label={`Tambah ${i.nama}`}
                     className="grid size-8 place-items-center rounded-lg border border-line text-ink-soft transition-colors hover:bg-canvas disabled:opacity-40"
                   >

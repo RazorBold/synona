@@ -1,7 +1,9 @@
+import { notFound } from "next/navigation";
+
 import { PosClient } from "@/components/pos/pos-client";
-import { formatTanggalPanjang } from "@/lib/date";
+import { businessDate, formatTanggalPanjang } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
-import { businessDate } from "@/lib/date";
+import { punyaBarang } from "@/lib/usaha";
 import {
   getOutletAktif,
   getRingkasanTanggal,
@@ -16,6 +18,9 @@ export const dynamic = "force-dynamic";
 
 export default async function KasirPage() {
   const outlet = await getOutletAktif();
+  // Usaha jasa murni tidak punya menu ini; membukanya lewat URL langsung
+  // pun tidak boleh membuka layar yang tidak berarti apa-apa baginya.
+  if (!punyaBarang(outlet.jenisUsaha)) notFound();
   const hariIni = businessDate(new Date(), outlet.timezone);
 
   const [produk, kategori, pelanggan, ringkasan] = await Promise.all([

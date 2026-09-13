@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { reminders } from "@/db/schema";
 import { businessDate, tambahHari } from "@/lib/date";
+import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true; jumlah?: number } | { ok: false; error: string };
@@ -20,6 +21,7 @@ export type HasilAksi = { ok: true; jumlah?: number } | { ok: false; error: stri
  * Yang sudah ditandai selesai tidak dibuat ulang pada hari yang sama.
  */
 export async function segarkanPengingat(): Promise<HasilAksi> {
+  await wajibSesi();
   const outlet = await getOutletAktif();
   const hariIni = businessDate(new Date(), outlet.timezone);
   const besok = tambahHari(hariIni, 1);
@@ -170,6 +172,7 @@ const UbahStatus = z.object({
 });
 
 export async function ubahStatusPengingat(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
   const parsed = UbahStatus.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Data tidak valid" };
   const d = parsed.data;
