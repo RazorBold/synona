@@ -6,7 +6,13 @@ import { useEffect, useState } from "react";
 
 import { aman } from "@/lib/aksi";
 import { formatRupiah } from "@/lib/money";
-import { SATUAN_LAYANAN, type SatuanLayanan } from "@/lib/usaha";
+import { PilihKategori } from "@/components/ui/pilih-kategori";
+import { PilihSatuan } from "@/components/ui/pilih-satuan";
+import {
+  SATUAN_ESTIMASI,
+  SATUAN_LAYANAN_BAWAAN,
+  type SatuanEstimasi,
+} from "@/lib/usaha";
 import { cn } from "@/lib/utils";
 import { simpanLayanan } from "@/server/actions/layanan";
 import type { BarisLayanan } from "@/server/queries/layanan";
@@ -16,11 +22,13 @@ export function LayananDialog({
   onOpenChange,
   layanan,
   kategori,
+  satuanTerpakai = [],
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   layanan: BarisLayanan | null;
   kategori: { id: string; nama: string }[];
+  satuanTerpakai?: string[];
 }) {
   const edit = Boolean(layanan);
 
@@ -29,9 +37,10 @@ export function LayananDialog({
   const [kategoriId, setKategoriId] = useState("");
   const [harga, setHarga] = useState(0);
   const [modal, setModal] = useState(0);
-  const [satuan, setSatuan] = useState<SatuanLayanan>("pcs");
+  const [satuan, setSatuan] = useState<string>("pcs");
   const [hargaBisaDiubah, setHargaBisaDiubah] = useState(false);
-  const [estimasiJam, setEstimasiJam] = useState(0);
+  const [estimasiNilai, setEstimasiNilai] = useState(0);
+  const [estimasiSatuan, setEstimasiSatuan] = useState<SatuanEstimasi>("jam");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +53,8 @@ export function LayananDialog({
     setModal(layanan?.modal ?? 0);
     setSatuan(layanan?.satuan ?? "pcs");
     setHargaBisaDiubah(layanan?.hargaBisaDiubah === 1);
-    setEstimasiJam(layanan?.estimasiJam ?? 0);
+    setEstimasiNilai(layanan?.estimasiNilai ?? 0);
+    setEstimasiSatuan(layanan?.estimasiSatuan ?? "jam");
     setError(null);
   }, [open, layanan]);
 
@@ -64,7 +74,8 @@ export function LayananDialog({
         modal,
         satuan,
         hargaBisaDiubah,
-        estimasiJam,
+        estimasiNilai,
+        estimasiSatuan,
       }),
     );
 
@@ -118,30 +129,17 @@ export function LayananDialog({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-ink">
-                Satuan penagihan
-              </label>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {SATUAN_LAYANAN.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => setSatuan(s.key)}
-                    className={cn(
-                      "rounded-2xl border px-2 py-2.5 text-center transition-colors",
-                      satuan === s.key
-                        ? "border-brand-300 bg-brand-50"
-                        : "border-line bg-white hover:bg-canvas",
-                    )}
-                  >
-                    <span className="block text-[13px] font-bold text-ink">
-                      {s.label}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] leading-tight text-muted">
-                      {s.ket}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <label className="text-sm font-semibold text-ink">Satuan</label>
+              <PilihSatuan
+                nilai={satuan}
+                onUbah={setSatuan}
+                bawaan={SATUAN_LAYANAN_BAWAAN}
+                terpakai={satuanTerpakai}
+                kelas={inputKelas}
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                Harga di bawah dihitung per satuan ini — per kg, per lembar, per paket.
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -206,44 +204,56 @@ export function LayananDialog({
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-ink">
-                  Kategori{" "}
-                  <span className="font-normal text-muted">(opsional)</span>
-                </label>
-                <select
-                  value={kategoriId}
-                  onChange={(e) => setKategoriId(e.target.value)}
-                  className={inputKelas}
-                >
-                  <option value="">— tanpa kategori —</option>
-                  {kategori.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.nama}
-                    </option>
+            <div>
+              <label className="text-sm font-semibold text-ink">
+                Kategori{" "}
+                <span className="font-normal text-muted">(opsional)</span>
+              </label>
+              <PilihKategori
+                nilai={kategoriId}
+                onUbah={setKategoriId}
+                kategori={kategori}
+                kelas={inputKelas}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-ink">
+                Perkiraan lama kerja{" "}
+                <span className="font-normal text-muted">(opsional)</span>
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={999}
+                  value={estimasiNilai || ""}
+                  placeholder="0"
+                  onChange={(e) => setEstimasiNilai(Number(e.target.value))}
+                  className="tabular h-12 w-28 rounded-2xl border border-line bg-canvas px-4 text-right text-sm font-bold text-ink outline-none focus:border-brand-200 focus:bg-white focus:ring-4 focus:ring-brand-100"
+                />
+                <div className="grid flex-1 grid-cols-4 gap-1.5">
+                  {SATUAN_ESTIMASI.map((e) => (
+                    <button
+                      key={e.nilai}
+                      type="button"
+                      onClick={() => setEstimasiSatuan(e.nilai)}
+                      className={cn(
+                        "rounded-xl border text-[13px] font-semibold transition-colors",
+                        estimasiSatuan === e.nilai
+                          ? "border-brand-300 bg-brand-50 text-brand-600"
+                          : "border-line bg-white text-ink-soft hover:bg-canvas",
+                      )}
+                    >
+                      {e.label}
+                    </button>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-ink">
-                  Perkiraan lama kerja
-                </label>
-                <div className="mt-2 flex items-center gap-2 rounded-2xl border border-line bg-canvas px-4 focus-within:border-brand-200 focus-within:bg-white focus-within:ring-4 focus-within:ring-brand-100">
-                  <input
-                    type="number"
-                    min={0}
-                    value={estimasiJam || ""}
-                    placeholder="0"
-                    onChange={(e) => setEstimasiJam(Number(e.target.value))}
-                    className="tabular h-12 w-full bg-transparent text-right text-sm font-bold text-ink outline-none"
-                  />
-                  <span className="text-sm font-semibold text-muted">jam</span>
                 </div>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={() => setHargaBisaDiubah(!hargaBisaDiubah)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors",

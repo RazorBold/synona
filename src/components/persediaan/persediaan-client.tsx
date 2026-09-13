@@ -42,14 +42,12 @@ type Tab = "semua" | JenisBahan;
 const TAB: { id: Tab; label: string }[] = [
   { id: "semua", label: "Semua" },
   { id: "baku", label: "Bahan Baku" },
-  { id: "setengah_jadi", label: "Setengah Jadi" },
-  { id: "jadi", label: "Barang Jadi" },
+  { id: "packaging", label: "Packaging" },
 ];
 
 const IKON_JENIS: Record<JenisBahan, string> = {
   baku: "🌾",
-  setengah_jadi: "🥣",
-  jadi: "📦",
+  packaging: "📦",
 };
 
 export function PersediaanClient({
@@ -304,7 +302,12 @@ export function PersediaanClient({
 
       </section>
 
-      <BahanDialog open={formOpen} onOpenChange={setFormOpen} bahan={terpilih} />
+      <BahanDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        bahan={terpilih}
+        satuanTerpakai={[...new Set(bahan.map((b) => b.satuan))]}
+      />
       <StokBahanDialog
         open={stokOpen}
         onOpenChange={setStokOpen}

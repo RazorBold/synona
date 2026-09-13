@@ -111,6 +111,9 @@ export function RekonsiliasiClient({
 
           <div className="mt-4 space-y-2">
             <Baris label="Penjualan tunai" nilai={sistem.penjualanTunai} masuk />
+            {sistem.pemasukanTunai > 0 && (
+              <Baris label="Pemasukan lain ke laci" nilai={sistem.pemasukanTunai} masuk />
+            )}
             <Baris label="Cicilan kasbon (tunai)" nilai={sistem.cicilanTunai} masuk />
             <Baris label="Beli bahan (tunai)" nilai={-sistem.pembelianTunai} />
             <Baris label="Bayar hutang supplier" nilai={-sistem.hutangTunai} />

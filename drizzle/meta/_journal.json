@@ -71,6 +71,13 @@
       "when": 1788670437395,
       "tag": "0009_graceful_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789312302374,
+      "tag": "0010_tan_sage",
+      "breakpoints": true
     }
   ]
 }

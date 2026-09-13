@@ -116,6 +116,12 @@ function mutasi(outletId: string): SQL {
            -e.amount, 'beban', e.name, e.id, e.occurred_at, e.business_date
       FROM expenses e
      WHERE e.outlet_id = ${outletId}
+
+    UNION ALL
+    SELECT ${akun(sql`oi.cash_account_id`, sql`'cash'`)},
+           oi.amount, 'pemasukan_lain', oi.name, oi.id, oi.occurred_at, oi.business_date
+      FROM other_incomes oi
+     WHERE oi.outlet_id = ${outletId}
   `;
 }
 

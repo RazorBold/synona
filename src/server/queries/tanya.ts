@@ -76,9 +76,11 @@ export async function getPertanyaanCerdas(
       COALESCE((SELECT COUNT(*) FROM transactions
                  WHERE outlet_id = ${outletId} AND status != 'void'
                    AND business_date = ${hariIni}), 0) AS txHariIni,
-      COALESCE((SELECT SUM((i.price_snapshot - i.cost_snapshot) * i.qty)
-                  FROM transaction_items i
-                  JOIN transactions t ON t.id = i.transaction_id
+      COALESCE((SELECT SUM(
+                  (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
+                     FROM transaction_items i WHERE i.transaction_id = t.id)
+                  - t.discount)
+                  FROM transactions t
                  WHERE t.outlet_id = ${outletId} AND t.status != 'void'
                    AND t.business_date = ${hariIni}), 0) AS labaHariIni,
       COALESCE((SELECT SUM(total) FROM transactions

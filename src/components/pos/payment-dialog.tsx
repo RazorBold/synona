@@ -8,6 +8,8 @@ import {
   Loader2,
   QrCode,
   TriangleAlert,
+  UserPlus,
+  UserRound,
   WalletCards,
   X,
 } from "lucide-react";
@@ -19,7 +21,7 @@ import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { buildWaLink, pesanStruk } from "@/lib/wa";
 import { simpanTransaksi, type HasilTransaksi } from "@/server/actions/transaksi";
-import { hitungSubtotal, useCart } from "@/store/cart";
+import { diskonBaris, hitungTotal, useCart } from "@/store/cart";
 import { aman } from "@/lib/aksi";
 
 type Metode = "cash" | "qris" | "transfer" | "debt";
@@ -42,13 +44,13 @@ export function PaymentDialog({
   pelanggan: { id: string; nama: string; phone: string | null }[];
   namaToko: string;
 }) {
-  const { items, diskon, kosongkan } = useCart();
-  const subtotal = hitungSubtotal(items);
-  const total = subtotal - Math.min(diskon, subtotal);
+  const { items, kosongkan } = useCart();
+  const total = hitungTotal(items);
 
   const [metode, setMetode] = useState<Metode>("cash");
   const [uang, setUang] = useState<number>(0);
-  const [customerId, setCustomerId] = useState<string>("");
+  const [namaPelanggan, setNamaPelanggan] = useState("");
+  const [teleponPelanggan, setTeleponPelanggan] = useState("");
   const [jatuhTempo, setJatuhTempo] = useState(() =>
     tambahHari(businessDate(), 7),
   );
@@ -62,6 +64,14 @@ export function PaymentDialog({
   const kembalian = Math.max(0, uang - total);
   const kurang = metode === "cash" && uang < total;
 
+  // Nama yang persis sama (tanpa peduli huruf besar) dianggap pelanggan lama;
+  // selain itu pelanggan baru yang dibuatkan otomatis oleh server.
+  const namaBersih = namaPelanggan.trim();
+  const cocok = namaBersih
+    ? pelanggan.find((p) => p.nama.toLowerCase() === namaBersih.toLowerCase()) ?? null
+    : null;
+  const pelangganBaru = Boolean(namaBersih) && !cocok;
+
   function tutup(v: boolean) {
     onOpenChange(v);
     if (!v) {
@@ -71,7 +81,8 @@ export function PaymentDialog({
         setError(null);
         setUang(0);
         setMetode("cash");
-        setCustomerId("");
+        setNamaPelanggan("");
+        setTeleponPelanggan("");
         setTeleponStruk("");
       }, 200);
     }
@@ -82,11 +93,12 @@ export function PaymentDialog({
     setError(null);
 
     const hasil = await aman(simpanTransaksi({
-      items: items.map((i) => ({ productId: i.id, qty: i.qty })),
-      discount: Math.min(diskon, subtotal),
+      items: items.map((i) => ({ productId: i.id, qty: i.qty, diskon: diskonBaris(i) })),
       paymentMethod: metode,
       paidAmount: metode === "cash" ? uang : total,
-      customerId: metode === "debt" ? customerId || null : customerId || null,
+      customerId: cocok?.id ?? null,
+      namaPelanggan: cocok ? null : namaBersih || null,
+      teleponPelanggan: pelangganBaru ? teleponPelanggan.trim() || null : null,
       dueDate: metode === "debt" ? jatuhTempo : null,
       note: null,
     }));
@@ -262,26 +274,62 @@ export function PaymentDialog({
                   </div>
                 )}
 
-                {metode === "debt" && (
-                  <div className="mt-5 space-y-4">
-                    <div>
-                      <label className="text-sm font-semibold text-ink">
-                        Pelanggan
-                      </label>
-                      <select
-                        value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
-                        className="mt-2 h-12 w-full rounded-2xl border border-line bg-canvas px-4 text-sm font-medium text-ink outline-none focus:border-brand-200 focus:bg-white focus:ring-4 focus:ring-brand-100"
-                      >
-                        <option value="">— Pilih pelanggan —</option>
-                        {pelanggan.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nama}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                {/* Pelanggan: satu kolom untuk semua metode. Nama baru otomatis
+                    tersimpan di menu Pelanggan, jadi riwayat belanja & kasbon
+                    orang itu langsung terkumpul di satu tempat. */}
+                <div className="mt-5">
+                  <label htmlFor="nama-pelanggan" className="text-sm font-semibold text-ink">
+                    Nama pelanggan{" "}
+                    {metode === "debt" ? (
+                      <span className="font-normal text-danger">(wajib untuk utang)</span>
+                    ) : (
+                      <span className="font-normal text-muted">(opsional)</span>
+                    )}
+                  </label>
+                  <div className="relative mt-2">
+                    <UserRound className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                    <input
+                      id="nama-pelanggan"
+                      list="daftar-pelanggan"
+                      value={namaPelanggan}
+                      onChange={(e) => setNamaPelanggan(e.target.value)}
+                      autoComplete="off"
+                      placeholder="Ketik nama, pilih yang sudah ada atau buat baru"
+                      className="h-12 w-full rounded-2xl border border-line bg-canvas pl-11 pr-4 text-sm font-medium text-ink outline-none placeholder:font-normal placeholder:text-muted focus:border-brand-200 focus:bg-white focus:ring-4 focus:ring-brand-100"
+                    />
+                    <datalist id="daftar-pelanggan">
+                      {pelanggan.map((p) => (
+                        <option key={p.id} value={p.nama} />
+                      ))}
+                    </datalist>
+                  </div>
 
+                  {cocok && (
+                    <p className="mt-1.5 text-xs text-muted">
+                      Pelanggan lama
+                      {cocok.phone ? ` · ${cocok.phone}` : ""} — transaksi masuk ke riwayatnya.
+                    </p>
+                  )}
+
+                  {pelangganBaru && (
+                    <div className="mt-2 rounded-2xl bg-brand-50/60 p-3">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-600">
+                        <UserPlus className="size-3.5" />
+                        Pelanggan baru — otomatis tersimpan di menu Pelanggan
+                      </p>
+                      <input
+                        type="tel"
+                        value={teleponPelanggan}
+                        onChange={(e) => setTeleponPelanggan(e.target.value)}
+                        placeholder="No. WhatsApp (opsional)"
+                        className="mt-2 h-10 w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-muted focus:border-brand-200 focus:ring-4 focus:ring-brand-100"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {metode === "debt" && (
+                  <div className="mt-4 space-y-4">
                     <div>
                       <label className="text-sm font-semibold text-ink">
                         Jatuh tempo
@@ -298,27 +346,6 @@ export function PaymentDialog({
                       Transaksi ini akan tercatat sebagai kasbon dan muncul di
                       halaman Utang beserta pengingat WhatsApp.
                     </p>
-                  </div>
-                )}
-
-                {metode !== "debt" && pelanggan.length > 0 && (
-                  <div className="mt-5">
-                    <label className="text-sm font-semibold text-ink">
-                      Pelanggan{" "}
-                      <span className="font-normal text-muted">(opsional)</span>
-                    </label>
-                    <select
-                      value={customerId}
-                      onChange={(e) => setCustomerId(e.target.value)}
-                      className="mt-2 h-11 w-full rounded-2xl border border-line bg-canvas px-4 text-sm font-medium text-ink outline-none focus:border-brand-200 focus:bg-white focus:ring-4 focus:ring-brand-100"
-                    >
-                      <option value="">— Tanpa pelanggan —</option>
-                      {pelanggan.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nama}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 )}
 
@@ -340,7 +367,7 @@ export function PaymentDialog({
                     pending ||
                     items.length === 0 ||
                     kurang ||
-                    (metode === "debt" && !customerId)
+                    (metode === "debt" && !namaBersih)
                   }
                   className="flex h-12 flex-[2] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 to-brand-400 text-sm font-bold text-white shadow-pop transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:from-line disabled:to-line disabled:text-muted disabled:shadow-none"
                 >

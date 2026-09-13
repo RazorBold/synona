@@ -226,6 +226,13 @@ export function LaporanClient({
               masuk
             />
             <BarisKas label="Cicilan piutang" nilai={arusKas.cicilanPiutang} masuk />
+            {arusKas.pemasukanLain > 0 && (
+              <BarisKas
+                label="Pemasukan lain (modal, pinjaman…)"
+                nilai={arusKas.pemasukanLain}
+                masuk
+              />
+            )}
             <div className="flex items-center justify-between border-t border-line pt-2.5">
               <span className="text-[13px] font-bold text-ink">Total masuk</span>
               <span className="tabular text-sm font-extrabold text-success">

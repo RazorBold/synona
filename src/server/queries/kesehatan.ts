@@ -11,6 +11,8 @@ export type Status = "sehat" | "waspada" | "bahaya";
 export type ArusKas = {
   penjualanTunai: number;
   cicilanPiutang: number;
+  /** Modal, pinjaman, hibah — menambah kas, tapi BUKAN omzet atau laba. */
+  pemasukanLain: number;
   masuk: number;
   pembelianDibayar: number;
   pelunasanHutang: number;
@@ -38,6 +40,7 @@ export async function getArusKas(
     pembelian: number;
     pelunasan: number;
     beban: number;
+    lain: number;
   }>(sql`
     SELECT
       COALESCE((SELECT SUM(total) FROM transactions
@@ -56,16 +59,20 @@ export async function getArusKas(
                    AND pp.paid_at BETWEEN ${batasAwal} AND ${batasAkhir}), 0) AS pelunasan,
       COALESCE((SELECT SUM(amount) FROM expenses
                  WHERE outlet_id = ${outletId}
-                   AND business_date BETWEEN ${dari} AND ${sampai}), 0) AS beban
+                   AND business_date BETWEEN ${dari} AND ${sampai}), 0) AS beban,
+      COALESCE((SELECT SUM(amount) FROM other_incomes
+                 WHERE outlet_id = ${outletId}
+                   AND business_date BETWEEN ${dari} AND ${sampai}), 0) AS lain
   `);
 
-  const masuk = (row?.penjualan ?? 0) + (row?.cicilan ?? 0);
+  const masuk = (row?.penjualan ?? 0) + (row?.cicilan ?? 0) + (row?.lain ?? 0);
   const keluar =
     (row?.pembelian ?? 0) + (row?.pelunasan ?? 0) + (row?.beban ?? 0);
 
   return {
     penjualanTunai: row?.penjualan ?? 0,
     cicilanPiutang: row?.cicilan ?? 0,
+    pemasukanLain: row?.lain ?? 0,
     masuk,
     pembelianDibayar: row?.pembelian ?? 0,
     pelunasanHutang: row?.pelunasan ?? 0,
@@ -107,7 +114,7 @@ export async function getKesehatanKeuangan(
   }>(sql`
     SELECT COALESCE(SUM(tx.total), 0) AS omzet,
            COALESCE(SUM(
-             (SELECT COALESCE(SUM((i.price_snapshot - i.cost_snapshot) * i.qty), 0)
+             (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
                 FROM transaction_items i WHERE i.transaction_id = tx.id) - tx.discount
            ), 0) AS laba,
            COALESCE(SUM(
@@ -366,9 +373,9 @@ export async function getProfitabilitasProduk(
            SUM(i.qty) AS qty,
            SUM(i.line_total) AS omzet,
            SUM(i.cost_snapshot * i.qty) AS hpp,
-           SUM((i.price_snapshot - i.cost_snapshot) * i.qty) AS laba,
+           SUM(i.line_total - i.cost_snapshot * i.qty) AS laba,
            CAST(ROUND(
-             SUM((i.price_snapshot - i.cost_snapshot) * i.qty) * 100.0 /
+             SUM(i.line_total - i.cost_snapshot * i.qty) * 100.0 /
              NULLIF(SUM(i.line_total), 0)
            ) AS INTEGER) AS margin
       FROM transaction_items i

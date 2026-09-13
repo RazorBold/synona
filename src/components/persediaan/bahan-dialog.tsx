@@ -6,38 +6,39 @@ import { useEffect, useState } from "react";
 
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { SatuanBahan } from "@/lib/satuan";
+import { PilihSatuan } from "@/components/ui/pilih-satuan";
+import {
+  SATUAN_BAHAN_BAWAAN,
+  faktorSatuan,
+  satuanBesar as satuanBesarDari,
+} from "@/lib/satuan";
 import { simpanBahan } from "@/server/actions/persediaan";
 import type { JenisBahan } from "@/lib/persediaan";
 import type { BarisBahan } from "@/server/queries/persediaan";
 import { aman } from "@/lib/aksi";
 
 const JENIS: { key: JenisBahan; label: string; ket: string }[] = [
-  { key: "baku", label: "Bahan Baku", ket: "masih harus diolah" },
-  { key: "setengah_jadi", label: "Setengah Jadi", ket: "hasil olahan, dipakai lagi" },
-  { key: "jadi", label: "Barang Jadi", ket: "siap pakai / siap jual" },
-];
-
-const SATUAN: { key: SatuanBahan; label: string; ket: string }[] = [
-  { key: "g", label: "Gram", ket: "beras, kopi, gula" },
-  { key: "ml", label: "Mililiter", ket: "susu, sirup, minyak" },
-  { key: "pcs", label: "Pcs", ket: "cup, sedotan, kemasan" },
+  { key: "baku", label: "Bahan Baku", ket: "habis dipakai membuat produk" },
+  { key: "packaging", label: "Packaging", ket: "plastik, dus, cup, label" },
 ];
 
 export function BahanDialog({
   open,
   onOpenChange,
   bahan,
+  satuanTerpakai = [],
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   bahan: BarisBahan | null;
+  /** Satuan yang sudah pernah dipakai di outlet ini, untuk ditawarkan lagi. */
+  satuanTerpakai?: string[];
 }) {
   const edit = Boolean(bahan);
 
   const [nama, setNama] = useState("");
   const [jenis, setJenis] = useState<JenisBahan>("baku");
-  const [satuan, setSatuan] = useState<SatuanBahan>("g");
+  const [satuan, setSatuan] = useState<string>("g");
   const [batasStok, setBatasStok] = useState(0);
   const [stokAwal, setStokAwal] = useState(0);
   const [hargaAwal, setHargaAwal] = useState(0);
@@ -55,8 +56,8 @@ export function BahanDialog({
     setError(null);
   }, [open, bahan]);
 
-  const satuanBesar = satuan === "g" ? "kg" : satuan === "ml" ? "liter" : "pcs";
-  const faktor = satuan === "pcs" ? 1 : 1000;
+  const satuanBesar = satuanBesarDari(satuan);
+  const faktor = faktorSatuan(satuan);
 
   async function simpan() {
     setPending(true);
@@ -90,7 +91,7 @@ export function BahanDialog({
               <Dialog.Description className="mt-0.5 text-sm text-muted">
                 {edit
                   ? "Stok dan harga berubah lewat pembelian atau penyesuaian."
-                  : "Bahan mentah, olahan setengah jadi, atau barang jadi."}
+                  : "Bahan baku atau packaging yang dipakai usaha Anda."}
               </Dialog.Description>
             </div>
             <Dialog.Close className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-canvas">
@@ -114,10 +115,11 @@ export function BahanDialog({
 
             <div>
               <label className="text-sm font-semibold text-ink">Jenis</label>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 {JENIS.map((j) => (
                   <button
                     key={j.key}
+                    type="button"
                     onClick={() => setJenis(j.key)}
                     className={cn(
                       "rounded-2xl border px-2 py-3 text-center transition-colors",
@@ -139,31 +141,18 @@ export function BahanDialog({
 
             <div>
               <label className="text-sm font-semibold text-ink">Satuan</label>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {SATUAN.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => setSatuan(s.key)}
-                    disabled={edit}
-                    className={cn(
-                      "rounded-2xl border px-2 py-3 text-center transition-colors disabled:opacity-60",
-                      satuan === s.key
-                        ? "border-brand-300 bg-brand-50"
-                        : "border-line bg-white hover:bg-canvas",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "block text-[13px] font-bold",
-                        satuan === s.key ? "text-brand-600" : "text-ink-soft",
-                      )}
-                    >
-                      {s.label}
-                    </span>
-                    <span className="block text-[10px] text-muted">{s.ket}</span>
-                  </button>
-                ))}
-              </div>
+              <PilihSatuan
+                nilai={satuan}
+                onUbah={setSatuan}
+                bawaan={SATUAN_BAHAN_BAWAAN}
+                terpakai={satuanTerpakai}
+                kelas={inputKelas}
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                Berat dan cairan dicatat dalam gram/ml supaya takaran kecil tidak
+                terbulatkan; harga tetap diisi per kg/liter.
+                {edit && " Satuan hanya bisa diganti selama stoknya 0."}
+              </p>
             </div>
 
             {!edit && (
@@ -215,7 +204,7 @@ export function BahanDialog({
               <label className="text-sm font-semibold text-ink">
                 Batas menipis{" "}
                 <span className="font-normal text-muted">
-                  (dalam {satuan === "pcs" ? "pcs" : satuan})
+                  (dalam {satuan})
                 </span>
               </label>
               <input

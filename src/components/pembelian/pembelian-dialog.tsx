@@ -8,6 +8,7 @@ import { aman } from "@/lib/aksi";
 import { metodeAkun } from "@/lib/kas";
 import { businessDate, tambahHari } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
+import { faktorSatuan, satuanBesar } from "@/lib/satuan";
 import { simpanPembelian } from "@/server/actions/pembelian";
 import type { AkunKas } from "@/server/queries/kas";
 import type { ProdukBelanja } from "@/server/queries/pembelian";
@@ -72,9 +73,8 @@ export function PembelianDialog({
       return { label: produk.find((p) => p.id === b.refId)?.satuan ?? "pcs", faktor: 1 };
     }
     const m = bahan.find((x) => x.id === b.refId);
-    if (m?.satuan === "g") return { label: "kg", faktor: 1000 };
-    if (m?.satuan === "ml") return { label: "liter", faktor: 1000 };
-    return { label: "pcs", faktor: 1 };
+    const satuan = m?.satuan ?? "pcs";
+    return { label: satuanBesar(satuan), faktor: faktorSatuan(satuan) };
   }
 
   async function simpan() {

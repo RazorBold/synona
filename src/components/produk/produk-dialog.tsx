@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { kompresGambar, urlGambar } from "@/lib/gambar";
 import { formatRupiah, persen } from "@/lib/money";
+import { PilihKategori } from "@/components/ui/pilih-kategori";
+import { PilihSatuan } from "@/components/ui/pilih-satuan";
 import { cn } from "@/lib/utils";
 import { simpanProduk } from "@/server/actions/produk";
 import type { BarisProduk } from "@/server/queries/produk";
@@ -21,10 +23,18 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   kategori: { id: string; nama: string }[];
+  /** Satuan yang sudah dipakai produk lain di outlet ini. */
+  satuanTerpakai?: string[];
   produk: BarisProduk | null;
 };
 
-export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
+export function ProdukDialog({
+  open,
+  onOpenChange,
+  kategori,
+  produk,
+  satuanTerpakai = [],
+}: Props) {
   const edit = Boolean(produk);
   const inputFile = useRef<HTMLInputElement>(null);
 
@@ -255,18 +265,12 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Kategori</Label>
-                <select
-                  value={kategoriId}
-                  onChange={(e) => setKategoriId(e.target.value)}
-                  className={inputKelas}
-                >
-                  <option value="">— Tanpa kategori —</option>
-                  {kategori.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.nama}
-                    </option>
-                  ))}
-                </select>
+                <PilihKategori
+                  nilai={kategoriId}
+                  onUbah={setKategoriId}
+                  kategori={kategori}
+                  kelas={inputKelas}
+                />
               </div>
               <div>
                 <Label>
@@ -324,10 +328,12 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
                 <Label>Satuan</Label>
-                <input
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className={inputKelas}
+                <PilihSatuan
+                  nilai={unit}
+                  onUbah={setUnit}
+                  bawaan={SATUAN_PRODUK_BAWAAN}
+                  terpakai={satuanTerpakai}
+                  kelas={inputKelas}
                 />
               </div>
               {lacakStok && (
@@ -401,6 +407,11 @@ export function ProdukDialog({ open, onOpenChange, kategori, produk }: Props) {
     </Dialog.Root>
   );
 }
+
+const SATUAN_PRODUK_BAWAAN = [
+  "pcs", "kg", "gram", "liter", "botol", "bungkus", "dus", "pack", "sachet",
+  "kaleng", "lembar", "meter", "set", "porsi", "cup",
+].map((nilai) => ({ nilai, label: nilai }));
 
 const inputKelas =
   "mt-2 h-12 w-full rounded-2xl border border-line bg-canvas px-4 text-sm font-medium text-ink outline-none transition-shadow placeholder:font-normal placeholder:text-muted focus:border-brand-200 focus:bg-white focus:ring-4 focus:ring-brand-100";

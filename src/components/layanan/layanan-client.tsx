@@ -16,7 +16,7 @@ import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { aman } from "@/lib/aksi";
 import { formatRupiah } from "@/lib/money";
-import { LABEL_SATUAN_LAYANAN } from "@/lib/usaha";
+import { formatEstimasi, labelSatuanLayanan } from "@/lib/usaha";
 import { cn } from "@/lib/utils";
 import { arsipkanLayanan } from "@/server/actions/layanan";
 import type { BarisLayanan } from "@/server/queries/layanan";
@@ -127,7 +127,7 @@ export function LayananClient({
                   <p className="truncate text-sm font-bold text-ink">{l.nama}</p>
                   <p className="truncate text-xs text-muted">
                     {l.namaKategori ?? "Tanpa kategori"}
-                    {l.estimasiJam > 0 && ` · ± ${l.estimasiJam} jam`}
+                    {l.estimasiNilai > 0 && ` · ${formatEstimasi(l.estimasiNilai, l.estimasiSatuan)}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -153,7 +153,7 @@ export function LayananClient({
                   {formatRupiah(l.harga)}
                   <span className="text-xs font-semibold text-muted">
                     {" "}
-                    / {LABEL_SATUAN_LAYANAN[l.satuan]}
+                    / {labelSatuanLayanan(l.satuan)}
                   </span>
                 </span>
                 <span className="tabular text-xs text-muted">
@@ -198,6 +198,7 @@ export function LayananClient({
         onOpenChange={setFormOpen}
         layanan={terpilih}
         kategori={kategori}
+        satuanTerpakai={[...new Set(layanan.map((l) => l.satuan))]}
       />
     </div>
   );

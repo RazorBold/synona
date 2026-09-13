@@ -1,11 +1,23 @@
 "use client";
 
-import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Tag, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import { GambarProduk } from "@/components/ui/gambar-produk";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { hitungJumlahItem, hitungSubtotal, batasQty, useCart } from "@/store/cart";
+import {
+  batasQty,
+  bersihBaris,
+  diskonBaris,
+  hitungDiskon,
+  hitungJumlahItem,
+  hitungSubtotal,
+  hitungTotal,
+  kotorBaris,
+  useCart,
+  type ItemKeranjang,
+} from "@/store/cart";
 
 export function CartPanel({
   onBayar,
@@ -14,11 +26,11 @@ export function CartPanel({
   onBayar: () => void;
   className?: string;
 }) {
-  const { items, diskon, setQty, hapus, setDiskon, kosongkan } = useCart();
+  const { items, setQty, hapus, kosongkan } = useCart();
 
   const subtotal = hitungSubtotal(items);
-  const potongan = Math.min(diskon, subtotal);
-  const total = subtotal - potongan;
+  const potongan = hitungDiskon(items);
+  const total = hitungTotal(items);
   const jumlahItem = hitungJumlahItem(items);
 
   return (
@@ -107,10 +119,19 @@ export function CartPanel({
                   </button>
                 </div>
 
-                <p className="tabular text-sm font-bold text-ink">
-                  {formatRupiah(i.harga * i.qty)}
-                </p>
+                <div className="text-right">
+                  {diskonBaris(i) > 0 && (
+                    <p className="tabular text-[11px] text-muted line-through">
+                      {formatRupiah(kotorBaris(i))}
+                    </p>
+                  )}
+                  <p className="tabular text-sm font-bold text-ink">
+                    {formatRupiah(bersihBaris(i))}
+                  </p>
+                </div>
               </div>
+
+              <DiskonBaris item={i} />
             </li>
           ))}
         </ul>
@@ -125,20 +146,14 @@ export function CartPanel({
             </dd>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">Diskon</dt>
-            <dd className="flex items-center gap-1.5">
-              <span className="text-sm text-muted">Rp</span>
-              <input
-                type="number"
-                min={0}
-                value={diskon || ""}
-                placeholder="0"
-                onChange={(e) => setDiskon(Number(e.target.value))}
-                className="tabular h-9 w-28 rounded-xl border border-line bg-white px-3 text-right text-sm font-semibold text-ink outline-none focus:border-brand-200 focus:ring-4 focus:ring-brand-100"
-              />
-            </dd>
-          </div>
+          {potongan > 0 && (
+            <div className="flex items-center justify-between">
+              <dt className="text-muted">Diskon</dt>
+              <dd className="tabular font-semibold text-emerald-600">
+                − {formatRupiah(potongan)}
+              </dd>
+            </div>
+          )}
 
           <div className="flex items-baseline justify-between border-t border-line pt-3">
             <dt className="font-semibold text-ink">Total</dt>
@@ -157,5 +172,53 @@ export function CartPanel({
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Diskon untuk satu baris. Tersembunyi di balik tautan kecil supaya
+ * keranjang tidak penuh kolom kosong — sebagian besar penjualan tanpa diskon.
+ */
+function DiskonBaris({ item }: { item: ItemKeranjang }) {
+  const setDiskonItem = useCart((s) => s.setDiskonItem);
+  const aktif = diskonBaris(item) > 0;
+  const [buka, setBuka] = useState(aktif);
+
+  if (!buka && !aktif) {
+    return (
+      <button
+        type="button"
+        onClick={() => setBuka(true)}
+        className="mt-1.5 ml-[52px] inline-flex items-center gap-1 text-[12px] font-semibold text-brand-500 hover:text-brand-600"
+      >
+        <Tag className="size-3" /> Beri diskon
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 ml-[52px] flex items-center gap-2">
+      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-muted">
+        <Tag className="size-3" /> Diskon
+      </span>
+      <div className="flex items-center gap-1 rounded-lg border border-line bg-white px-2 focus-within:border-brand-200 focus-within:ring-2 focus-within:ring-brand-100">
+        <span className="text-[12px] text-muted">Rp</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={kotorBaris(item)}
+          autoFocus={!aktif}
+          value={item.diskon || ""}
+          placeholder="0"
+          onChange={(e) => setDiskonItem(item.id, Number(e.target.value))}
+          aria-label={`Diskon ${item.nama}`}
+          className="tabular h-8 w-24 bg-transparent text-right text-[13px] font-semibold text-ink outline-none"
+        />
+      </div>
+      {(item.diskon ?? 0) > kotorBaris(item) && (
+        <span className="text-[11px] text-warning">maks. {formatRupiah(kotorBaris(item))}</span>
+      )}
+    </div>
   );
 }

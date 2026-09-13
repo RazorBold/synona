@@ -20,7 +20,8 @@ export type KategoriMutasi =
   | "transfer_keluar"
   | "pembelian"
   | "pelunasan_hutang"
-  | "beban";
+  | "beban"
+  | "pemasukan_lain";
 
 export const LABEL_KATEGORI: Record<KategoriMutasi, string> = {
   penjualan: "Penjualan",
@@ -30,7 +31,17 @@ export const LABEL_KATEGORI: Record<KategoriMutasi, string> = {
   pembelian: "Pembelian stok",
   pelunasan_hutang: "Bayar hutang",
   beban: "Beban",
+  pemasukan_lain: "Pemasukan lain",
 };
+
+export type KategoriPemasukan = "modal" | "pinjaman" | "hibah" | "lainnya";
+
+export const KATEGORI_PEMASUKAN: { nilai: KategoriPemasukan; label: string; ket: string }[] = [
+  { nilai: "modal", label: "Setoran modal", ket: "uang pribadi pemilik masuk ke usaha" },
+  { nilai: "pinjaman", label: "Pinjaman", ket: "dari bank, koperasi, atau keluarga" },
+  { nilai: "hibah", label: "Hibah / bantuan", ket: "bantuan usaha, hadiah, donasi" },
+  { nilai: "lainnya", label: "Lainnya", ket: "bunga bank, jual aset bekas, dll." },
+];
 
 export type MetodeBayar = "cash" | "qris" | "transfer" | "other";
 

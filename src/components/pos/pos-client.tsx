@@ -9,7 +9,7 @@ import { PaymentDialog } from "@/components/pos/payment-dialog";
 import { ProductGrid } from "@/components/pos/product-grid";
 import { formatRupiah } from "@/lib/money";
 import type { ProdukPos } from "@/server/queries/pos";
-import { hitungJumlahItem, hitungSubtotal, useCart } from "@/store/cart";
+import { hitungJumlahItem, hitungTotal, useCart } from "@/store/cart";
 
 type Props = {
   produk: ProdukPos[];
@@ -23,15 +23,13 @@ export function PosClient({ produk, kategori, pelanggan, namaToko }: Props) {
   const [keranjangOpen, setKeranjangOpen] = useState(false);
 
   const items = useCart((s) => s.items);
-  const diskon = useCart((s) => s.diskon);
 
   // Keranjang tersimpan dibaca setelah mount (lihat skipHydration di store).
   useEffect(() => {
     void useCart.persist.rehydrate();
   }, []);
 
-  const subtotal = hitungSubtotal(items);
-  const total = subtotal - Math.min(diskon, subtotal);
+  const total = hitungTotal(items);
   const jumlah = hitungJumlahItem(items);
 
   function bukaPembayaran() {
