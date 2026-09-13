@@ -143,6 +143,15 @@ export async function akunSesi(sesi: SesiAktif): Promise<AkunSesi | null> {
 
   if (!row) return null;
 
+  /**
+   * Akun yang dinonaktifkan diperlakukan sama seperti akun yang sudah tidak
+   * ada: pemanggilnya (layout aplikasi) melempar ke /sesi-berakhir yang
+   * membuang cookie-nya. Tanpa cek ini, staf yang baru dinonaktifkan tetap
+   * bisa memakai sesi lamanya sampai token 30 harinya kedaluwarsa — dan
+   * token JWT tidak bisa dicabut satu per satu.
+   */
+  if (row.aktif === 0) return null;
+
   return {
     penggunaId: row.id,
     nama: row.nama,

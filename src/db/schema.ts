@@ -789,6 +789,24 @@ export const pengguna = sqliteTable(
     peran: text("peran", { enum: ["pemilik", "kasir"] })
       .notNull()
       .default("kasir"),
+    /**
+     * Orang di tabel `users` yang memakai akun ini. Inilah jembatan antara
+     * kredensial dan keanggotaan outlet (`staff`) — tanpa itu, staf yang
+     * ditambahkan lewat Pengaturan → Outlet tidak pernah bisa masuk, dan staf
+     * yang dinonaktifkan tetap bisa login.
+     *
+     * NULL diperbolehkan untuk akun yang lahir sebelum jembatan ini ada
+     * (mis. `admin` hasil `npm run auth:init`): akunnya tetap sah, hanya tidak
+     * terikat ke baris `users` mana pun.
+     */
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * Dimatikan, bukan dihapus — sama seperti `staff.is_active`. Baris ini
+     * dirujuk sebagai jejak siapa yang pernah masuk, jadi menghapusnya akan
+     * memutus riwayat. Dicek saat login DAN di `akunSesi()`, supaya staf yang
+     * dinonaktifkan ikut terlempar keluar dari sesi yang masih hidup.
+     */
+    aktif: integer("aktif").notNull().default(1),
     harusGantiSandi: integer("harus_ganti_sandi").notNull().default(0),
     /**
      * Kode pemulihan sekali pakai, di-hash sama seperti sandi.
@@ -805,7 +823,13 @@ export const pengguna = sqliteTable(
       .notNull()
       .$defaultFn(() => Date.now()),
   },
-  (t) => [uniqueIndex("idx_pengguna_nama_pengguna").on(t.namaPengguna)],
+  (t) => [
+    uniqueIndex("idx_pengguna_nama_pengguna").on(t.namaPengguna),
+    // Satu orang paling banyak satu akun login. SQLite mengizinkan NULL
+    // berulang di unique index, jadi akun lama yang belum terikat tidak
+    // saling bentrok.
+    uniqueIndex("idx_pengguna_user").on(t.userId),
+  ],
 );
 
 export type Product = typeof products.$inferSelect;

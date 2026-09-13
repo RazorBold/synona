@@ -30,6 +30,7 @@ import { WhatsAppIcon } from "@/components/icons/whatsapp";
 import { punyaBarang, punyaJasa, type JenisUsaha } from "@/lib/usaha";
 import { cn } from "@/lib/utils";
 import { keluar } from "@/server/actions/auth";
+import { LogoSynona } from "@/components/ui/logo-synona";
 
 type ItemNavData = { href: string; label: string; icon: typeof Home };
 type Grup = { judul: string; item: ItemNavData[] };
@@ -164,9 +165,7 @@ export function Sidebar({
         {/* Logo */}
         <div className="relative px-6 pb-5 pt-6">
           <Link href="/" className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-pop">
-              <Store className="size-5 text-white" />
-            </span>
+            <LogoSynona tinggi={40} prioritas />
             <span className="text-2xl font-extrabold tracking-tight text-ink">
               Synona
             </span>

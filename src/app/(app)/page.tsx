@@ -13,6 +13,7 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AntreanCard } from "@/components/dashboard/antrean-card";
 import { LowStockCard } from "@/components/dashboard/low-stock-card";
 import { QuickActions } from "@/components/dashboard/quick-actions";
+import { PanelTanya } from "@/components/dashboard/panel-tanya";
 import { RadarPanel } from "@/components/dashboard/radar-panel";
 import { TipsBanner } from "@/components/dashboard/tips-banner";
 import {
@@ -116,6 +117,9 @@ export default async function DashboardPage({
 
         {/* Radar 6 pertanyaan */}
         <RadarPanel butir={d.radar} />
+
+        {/* Pertanyaan yang dipilih sesuai keadaan outlet hari ini */}
+        <PanelTanya butir={d.tanya} />
 
         {/* Grafik + utang jatuh tempo */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">

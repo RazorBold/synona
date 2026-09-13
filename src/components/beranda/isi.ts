@@ -19,26 +19,35 @@ import {
 export const KARTU: {
   judul: [string, string];
   isi: string;
-  warna: string;
   icon: LucideIcon;
+  tema: "biru" | "hijau" | "merah";
+  aksi: string;
+  /** Tujuan setelah masuk — /masuk meneruskannya lewat `?lanjut=`. */
+  tujuan: string;
 }[] = [
   {
-    judul: ["Penjualan", "& Pesanan"],
-    isi: "POS untuk barang, papan antrean untuk jasa.",
-    warna: "bg-kartu-biru",
+    judul: ["Penjualan &", "Pesanan"],
+    isi: "Catat transaksi, kelola pesanan, dan pantau penjualan harian dengan mudah.",
     icon: ShoppingCart,
+    tema: "biru",
+    aksi: "Kelola Penjualan",
+    tujuan: "/kasir",
   },
   {
     judul: ["Stok Selalu", "Terhitung"],
-    isi: "Berkurang sendiri tiap kali ada penjualan.",
-    warna: "bg-kartu-hijau",
+    isi: "Pantau stok barang dan bahan baku secara real-time. Dapat pengingat saat stok menipis.",
     icon: Package,
+    tema: "hijau",
+    aksi: "Kelola Stok",
+    tujuan: "/produk",
   },
   {
     judul: ["Laporan yang", "Menjawab"],
-    isi: "Sehat, waspada, atau bahaya — beserta alasannya.",
-    warna: "bg-kartu-merah",
+    isi: "Lihat laporan penjualan, laba rugi, stok, dan arus kas dalam tampilan yang mudah dipahami.",
     icon: LineChart,
+    tema: "merah",
+    aksi: "Lihat Laporan",
+    tujuan: "/laporan",
   },
 ];
 

@@ -39,12 +39,88 @@
 
   --radius-card: 1rem;
 
+  /* ---------------------------------------------------------------
+     Skala tipografi halaman depan.
+
+     Semuanya fluid terhadap lebar layar dan berhenti pada nilai yang
+     diukur dari rancangan 1528px. Ditulis sebagai token, bukan
+     clamp() yang ditebar di tiap komponen: begitu nilainya tersebar,
+     tidak ada lagi yang bisa memastikan judul bagian A dan bagian B
+     benar-benar seukuran.
+  --------------------------------------------------------------- */
+  --text-hero: clamp(2.5rem, 4.9vw, 4.75rem);
+  --text-hero--line-height: 1.02;
+  --text-hero--letter-spacing: -0.022em;
+
+  --text-judul-1: clamp(1.875rem, 3.6vw, 3.25rem);
+  --text-judul-1--line-height: 1.08;
+  --text-judul-1--letter-spacing: -0.02em;
+
+  --text-judul-2: clamp(1.375rem, 1.85vw, 1.75rem);
+  --text-judul-2--line-height: 1.15;
+  --text-judul-2--letter-spacing: -0.015em;
+
+  --text-judul-3: clamp(1rem, 1.1vw, 1.125rem);
+  --text-judul-3--line-height: 1.3;
+  --text-judul-3--letter-spacing: -0.01em;
+
+  --text-lead: clamp(0.9375rem, 1.05vw, 1.0625rem);
+  --text-lead--line-height: 1.65;
+
+  --text-tubuh: 0.9375rem;
+  --text-tubuh--line-height: 1.65;
+
+  --text-kecil: 0.8125rem;
+  --text-kecil--line-height: 1.6;
+
+  --text-mikro: 0.75rem;
+  --text-mikro--line-height: 1.5;
+
+  /* Angka besar bergaya display (mis. 01/02/03 pada daftar langkah). */
+  --text-angka: clamp(2rem, 2.6vw, 2.75rem);
+  --text-angka--line-height: 1;
+
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1.2;
+  --text-eyebrow--letter-spacing: 0.16em;
+
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04),
     0 8px 24px -12px rgba(16, 24, 40, 0.1);
   --shadow-pop: 0 8px 24px -8px rgba(109, 93, 246, 0.45);
 }
 
 @layer base {
+  /* ---------------------------------------------------------------
+     Satu sumber untuk lebar isi dan jaraknya ke tepi layar.
+
+     `min(8.12%, 124px)`, bukan `8.12%` saja: padding persen selalu
+     dihitung terhadap lebar INDUK — yaitu lebar layar — bukan terhadap
+     kotak max-width tempat ia dipasang. Tanpa batas 124px (8,12% dari
+     1528px), isi tiap bagian bergeser makin ke dalam begitu layar lebih
+     lebar dari 1528px dan tidak lagi sebaris dengan judul di hero.
+  --------------------------------------------------------------- */
+  :root {
+    --lebar-isi: 1528px;
+    --sisi-isi: 1.25rem;
+    --ruang-bagian: 4.5rem;
+    --ruang-blok: 2.5rem;
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --sisi-isi: 2rem;
+      --ruang-bagian: 5.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      --sisi-isi: min(8.12%, 124px);
+      --ruang-bagian: 7rem;
+      --ruang-blok: 3.5rem;
+    }
+  }
+
   html {
     -webkit-tap-highlight-color: transparent;
   }
@@ -90,6 +166,28 @@
   }
 }
 
+/* ------------------------------------------------------------------
+   Utilitas tata letak halaman depan
+------------------------------------------------------------------- */
+
+/** Wadah isi: satu-satunya penentu lebar dan jarak ke tepi. */
+@utility wadah {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--lebar-isi);
+  padding-inline: var(--sisi-isi);
+}
+
+/** Jarak atas-bawah antar bagian besar. */
+@utility bagian {
+  padding-block: var(--ruang-bagian);
+}
+
+/** Jarak antara kepala bagian dan isinya. */
+@utility blok {
+  margin-top: var(--ruang-blok);
+}
+
 /* Scrollbar tipis di sidebar & daftar panjang */
 .thin-scroll::-webkit-scrollbar {
   width: 6px;
@@ -98,3 +196,56 @@
   background: #e2e5ee;
   border-radius: 999px;
 }
+
+/* Animasi 3D & Efek Visual */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(1.5deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(10px) rotate(-1.5deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-reverse,
+  .animate-pulse-glow {
+    animation: none;
+  }
+}
+

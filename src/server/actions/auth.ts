@@ -1,13 +1,16 @@
 "use server";
 
-import { eq, isNull } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { outlets, pengguna } from "@/db/schema";
+import { outlets, pengguna, staff, users } from "@/db/schema";
 import { RUTE_GANTI_SANDI, RUTE_MASUK } from "@/lib/auth-const";
 import type { JenisUsaha } from "@/lib/usaha";
+import { normalisasiNomorHp } from "@/lib/wa";
+import { buatAkunKasBawaan } from "@/server/kas";
 import {
   bolehCobaLogin,
   buatSalt,
@@ -82,6 +85,16 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: "Nama pengguna atau sandi salah" };
   }
 
+  /**
+   * Akun nonaktif ditolak dengan pesan yang SAMA seperti sandi salah. Pesan
+   * khusus ("akun dinonaktifkan") akan memberi tahu penebak bahwa nama
+   * penggunanya benar-benar ada — dan sandinya benar.
+   */
+  if (akun.aktif === 0) {
+    catatLoginGagal(namaPengguna);
+    return { ok: false, error: "Nama pengguna atau sandi salah" };
+  }
+
   resetLoginGagal(namaPengguna);
   await buatSesi({
     penggunaId: akun.id,
@@ -89,7 +102,7 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
     peran: akun.peran,
   });
 
-  if (jenisUsaha) simpanJenisUsahaAwal(jenisUsaha, akun.peran);
+  if (jenisUsaha) simpanJenisUsahaAwal(jenisUsaha, akun);
 
   redirect(tujuanAman(lanjut));
 }
@@ -100,13 +113,35 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
  * Klausa `jenis_usaha IS NULL` itu penjaganya: setelah terisi, nilai dari
  * halaman masuk tidak bisa lagi menimpanya — penggantian berikutnya hanya
  * lewat Pengaturan → Outlet oleh pemilik yang sudah masuk.
+ *
+ * Sejak pendaftaran dibuka untuk banyak usaha, perubahannya WAJIB dibatasi ke
+ * outlet milik yang login. Tanpa batasan itu, satu pemilik yang menjawab
+ * pertanyaan di halaman masuk akan ikut menetapkan jenis usaha milik orang
+ * lain yang kebetulan juga belum memilih.
  */
-function simpanJenisUsahaAwal(jenis: JenisUsaha, peran: string): void {
-  if (peran !== "pemilik") return;
-  db.update(outlets)
-    .set({ jenisUsaha: jenis })
-    .where(isNull(outlets.jenisUsaha))
-    .run();
+function simpanJenisUsahaAwal(
+  jenis: JenisUsaha,
+  akun: { id: string; peran: string; userId: string | null },
+): void {
+  if (akun.peran !== "pemilik") return;
+
+  if (akun.userId) {
+    db.run(sql`
+      UPDATE outlets SET jenis_usaha = ${jenis}
+       WHERE jenis_usaha IS NULL
+         AND id IN (SELECT outlet_id FROM staff
+                     WHERE user_id = ${akun.userId} AND is_active = 1)
+    `);
+    return;
+  }
+
+  // Akun warisan yang belum tertaut ke baris `users` mana pun memakai outlet
+  // pertama — jalur yang sama dengan cadangan di `getOutletAktif()`.
+  db.run(sql`
+    UPDATE outlets SET jenis_usaha = ${jenis}
+     WHERE jenis_usaha IS NULL
+       AND id = (SELECT id FROM outlets ORDER BY created_at LIMIT 1)
+  `);
 }
 
 /** Apakah pemasangan ini belum pernah memilih jenis usaha. */
@@ -117,6 +152,155 @@ export async function perluPilihJenisUsaha(): Promise<boolean> {
     .limit(1)
     .get();
   return Boolean(row) && row!.jenisUsaha === null;
+}
+
+/* ------------------------------------------------------- pendaftaran */
+
+/**
+ * Apakah pemasangan ini belum punya akun sama sekali.
+ *
+ * Dipakai halaman /masuk untuk melempar pemasangan yang benar-benar kosong ke
+ * /register — bukan lagi untuk menutup pendaftaran. Pendaftaran sekarang
+ * terbuka: setiap yang mendaftar mendapat outletnya sendiri, dan
+ * `getOutletAktif()` memilih outlet dari sesi, jadi usaha yang satu tidak
+ * pernah melihat data usaha yang lain.
+ */
+export async function belumAdaAkunSamaSekali(): Promise<boolean> {
+  const ada = db.select({ id: pengguna.id }).from(pengguna).limit(1).get();
+  return !ada;
+}
+
+const DaftarInput = z.object({
+  namaOutlet: z.string().trim().min(2, "Nama outlet minimal 2 huruf").max(80),
+  namaPemilik: z.string().trim().min(2, "Nama pemilik minimal 2 huruf").max(80),
+  jenisUsaha: z.enum(["dagang", "jasa", "campuran"], {
+    message: "Pilih jenis usaha dulu",
+  }),
+  namaPengguna: z
+    .string()
+    .trim()
+    .min(3, "Nama pengguna minimal 3 huruf")
+    .max(64)
+    .regex(
+      /^[a-z0-9._-]+$/i,
+      "Nama pengguna hanya boleh huruf, angka, titik, garis bawah, dan strip",
+    ),
+  /**
+   * Opsional, dan hanya disimpan sebagai keterangan pemilik. Synona tidak
+   * mengirim email atau SMS ke mana pun (tidak ada SMTP di pemasangan ini),
+   * jadi keduanya tidak dipakai untuk memulihkan sandi — itu lewat kode
+   * pemulihan di /lupa-sandi.
+   */
+  email: z.string().trim().max(120).nullable().default(null),
+  telepon: z.string().trim().max(24).nullable().default(null),
+  sandi: z.string().min(1, "Sandi wajib diisi").max(200),
+  ulangiSandi: z.string().min(1, "Ulangi sandi wajib diisi").max(200),
+});
+
+/**
+ * Mendaftarkan satu usaha baru: satu outlet, satu pemilik, satu akun masuk —
+ * dibuat sekaligus dalam satu transaksi, lalu langsung disesikan.
+ *
+ * Boleh dipanggil berkali-kali: tiap pendaftaran menghasilkan outlet DAN
+ * baris `staff` sendiri, dan `getOutletAktif()` memilih outlet lewat
+ * keanggotaan staf milik sesi. Dua syarat itu yang membuat pendaftaran
+ * terbuka tidak membocorkan data usaha yang satu ke yang lain — jangan
+ * melonggarkan salah satunya tanpa yang lain.
+ *
+ * Yang tetap dijaga: nama pengguna unik se-aplikasi.
+ */
+export async function daftar(input: unknown): Promise<HasilAksi> {
+  const parsed = DaftarInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+  const d = parsed.data;
+
+  if (d.sandi !== d.ulangiSandi) {
+    return { ok: false, error: "Sandi dan ulangannya tidak sama" };
+  }
+  const lemah = periksaKekuatanSandi(d.sandi);
+  if (lemah) return { ok: false, error: lemah };
+
+  const namaPengguna = d.namaPengguna.toLowerCase();
+
+  const email = d.email?.trim().toLowerCase() || null;
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return { ok: false, error: "Email tidak valid" };
+  }
+  const telepon = d.telepon?.trim() ? normalisasiNomorHp(d.telepon) : null;
+
+  // scrypt di luar transaksi: transaksi better-sqlite3 berjalan sinkron dan
+  // tidak boleh diberi callback async di tengahnya.
+  const salt = buatSalt();
+  const hash = await hashSandi(d.sandi, salt);
+
+  const penggunaId = nanoid();
+
+  try {
+    db.transaction((tx) => {
+      const dobel = tx
+        .select({ id: pengguna.id })
+        .from(pengguna)
+        .where(eq(pengguna.namaPengguna, namaPengguna))
+        .get();
+      if (dobel) throw new Error("Nama pengguna itu sudah dipakai");
+
+      const userId = nanoid();
+      tx.insert(users)
+        .values({
+          id: userId,
+          // Email boleh dikosongkan. Kolomnya NOT NULL + unik, jadi yang
+          // kosong diisi turunan nama pengguna — nilai itu tidak pernah
+          // dikirimi apa pun, hanya menjaga keunikan baris.
+          email: email ?? `${namaPengguna}@synona.local`,
+          name: d.namaPemilik,
+          phone: telepon,
+          plan: "mulai",
+        })
+        .run();
+
+      const outletId = nanoid();
+      tx.insert(outlets)
+        .values({
+          id: outletId,
+          ownerId: userId,
+          name: d.namaOutlet,
+          jenisUsaha: d.jenisUsaha,
+        })
+        .run();
+
+      // Kas laci, rekening bank, dan QRIS — sama seperti outlet yang dibuat
+      // dari Pengaturan (lihat simpanOutlet). Tanpa ini penjualan pertama
+      // tidak punya akun kas untuk dicatat.
+      buatAkunKasBawaan(tx as never, outletId);
+
+      tx.insert(staff)
+        .values({ id: nanoid(), outletId, userId, role: "owner" })
+        .run();
+
+      tx.insert(pengguna)
+        .values({
+          id: penggunaId,
+          nama: d.namaPemilik,
+          namaPengguna,
+          hashSandi: hash,
+          salt,
+          peran: "pemilik",
+          // Ditautkan ke baris `users` yang baru dibuat di atas — jalur yang
+          // sama dipakai `simpanStaf()` saat membuatkan akun untuk kasir,
+          // sehingga pemilik dan staf hidup di model yang sama.
+          userId,
+          harusGantiSandi: 0,
+        })
+        .run();
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Gagal mendaftar" };
+  }
+
+  await buatSesi({ penggunaId, namaPengguna, peran: "pemilik" });
+  redirect("/");
 }
 
 export async function keluar(): Promise<never> {

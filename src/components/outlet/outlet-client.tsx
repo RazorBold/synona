@@ -256,7 +256,20 @@ export function OutletClient({
                   )}
                 </p>
                 <p className="truncate text-xs text-muted">
-                  {s.email} · {s.namaOutlet}
+                  {s.namaOutlet} ·{" "}
+                  {s.namaPengguna ? (
+                    <>
+                      masuk sebagai{" "}
+                      <span className="font-semibold text-ink-soft">
+                        {s.namaPengguna}
+                      </span>
+                      {s.akunAktif === 0 && " (dicabut)"}
+                    </>
+                  ) : (
+                    <span className="font-semibold text-amber-600">
+                      belum bisa masuk
+                    </span>
+                  )}
                 </p>
               </div>
               <span
@@ -503,8 +516,14 @@ function StafDialog({
   const [telepon, setTelepon] = useState("");
   const [peran, setPeran] = useState<"owner" | "kasir">("kasir");
   const [outletId, setOutletId] = useState("");
+  const [namaPengguna, setNamaPengguna] = useState("");
+  const [sandi, setSandi] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Staf lama yang belum punya akun masuk sama sekali — dialognya menawarkan
+  // pembuatan akun, bukan sekadar penggantian sandi.
+  const sudahPunyaAkun = Boolean(staf?.namaPengguna);
 
   useEffect(() => {
     if (!open) return;
@@ -513,6 +532,8 @@ function StafDialog({
     setTelepon(staf?.telepon ?? "");
     setPeran(staf?.peran ?? "kasir");
     setOutletId(staf?.outletId ?? daftarOutlet[0]?.id ?? "");
+    setNamaPengguna(staf?.namaPengguna ?? "");
+    setSandi("");
     setError(null);
   }, [open, staf, daftarOutlet]);
 
@@ -526,6 +547,8 @@ function StafDialog({
       email,
       telepon: telepon.trim() || null,
       peran,
+      namaPengguna: namaPengguna.trim() || null,
+      sandi: sandi || null,
     }));
     setPending(false);
     if (!hasil.ok) return setError(hasil.error);
@@ -603,6 +626,52 @@ function StafDialog({
                 <option value="owner">Pemilik</option>
               </select>
             </div>
+          </div>
+
+          <div className="border-t border-line pt-4">
+            <p className="text-sm font-semibold text-ink">Akses masuk</p>
+            <p className="mt-0.5 text-xs text-muted">
+              {sudahPunyaAkun
+                ? "Kosongkan sandi kalau tidak ingin menggantinya."
+                : "Isi kalau staf ini perlu bisa membuka aplikasi. Biarkan kosong untuk mencatat namanya saja."}
+            </p>
+
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-sm font-semibold text-ink">
+                  Nama pengguna
+                </label>
+                <input
+                  value={namaPengguna}
+                  onChange={(e) => setNamaPengguna(e.target.value)}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="mis. budi.kasir"
+                  className={inputKelas}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-ink">
+                  {sudahPunyaAkun ? "Sandi baru" : "Sandi awal"}{" "}
+                  <span className="font-normal text-muted">(min. 8)</span>
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={sandi}
+                  onChange={(e) => setSandi(e.target.value)}
+                  placeholder={sudahPunyaAkun ? "biarkan kosong" : ""}
+                  className={inputKelas}
+                />
+              </div>
+            </div>
+
+            {namaPengguna.trim() && (
+              <p className="mt-3 rounded-xl bg-amber-50 px-4 py-2.5 text-xs text-ink-soft">
+                Staf akan diminta mengganti sandi ini sendiri saat pertama kali
+                masuk.
+              </p>
+            )}
           </div>
         </Bingkai>
       </Dialog.Portal>

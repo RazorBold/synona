@@ -17,6 +17,14 @@ export const RUTE_BERANDA = "/beranda";
 export const RUTE_GANTI_SANDI = "/ganti-sandi";
 export const RUTE_LUPA_SANDI = "/lupa-sandi";
 
+/**
+ * Pendaftaran outlet pertama. Hanya bisa dibuka selama tabel `pengguna` masih
+ * kosong — begitu akun pertama dibuat, rute ini menutup diri sendiri (lihat
+ * `daftar()` di server/actions/auth.ts). Aplikasi ini satu-pemilik per
+ * pemasangan, jadi ini bukan pendaftaran pelanggan baru berulang kali.
+ */
+export const RUTE_DAFTAR = "/register";
+
 /** Route handler yang membersihkan cookie sesi yang sudah tidak sah. */
 export const RUTE_SESI_BERAKHIR = "/sesi-berakhir";
 

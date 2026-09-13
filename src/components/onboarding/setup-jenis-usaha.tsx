@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Loader2, Store, TriangleAlert } from "lucide-react";
+import { ArrowRight, Loader2, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -8,6 +8,7 @@ import { PilihJenisUsaha } from "@/components/onboarding/pilih-jenis-usaha";
 import { aman } from "@/lib/aksi";
 import type { JenisUsaha } from "@/lib/usaha";
 import { simpanJenisUsaha } from "@/server/actions/outlet";
+import { LogoSynona } from "@/components/ui/logo-synona";
 
 /**
  * Layar penyiapan untuk pengguna yang SUDAH masuk tapi outletnya belum punya
@@ -53,9 +54,7 @@ export function SetupJenisUsaha({
 
       <div className="mx-auto w-full max-w-[680px]">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-pop">
-            <Store className="size-5 text-white" />
-          </span>
+          <LogoSynona tinggi={40} />
           <span className="text-2xl font-extrabold tracking-tight text-ink">
             Synona
           </span>

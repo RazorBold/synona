@@ -1,9 +1,9 @@
 "use client";
 
-import { Loader2, TriangleAlert } from "lucide-react";
+import { ArrowRight, KeyRound, Loader2, Lock, TriangleAlert, User } from "lucide-react";
 import { useState } from "react";
 
-import { inputKelas, tombolKelas } from "@/components/auth/kartu-auth";
+import { Medan, MedanSandi } from "@/components/auth/medan";
 import { pulihkanSandi } from "@/server/actions/auth";
 import { aman } from "@/lib/aksi";
 
@@ -20,7 +20,9 @@ export function FormLupaSandi() {
     setPending(true);
     setError(null);
 
-    const hasil = await aman(pulihkanSandi({ namaPengguna, kode, sandiBaru, ulangiSandi }));
+    const hasil = await aman(
+      pulihkanSandi({ namaPengguna, kode, sandiBaru, ulangiSandi }),
+    );
     if (!hasil.ok) {
       setError(hasil.error);
       setPending(false);
@@ -28,71 +30,60 @@ export function FormLupaSandi() {
   }
 
   return (
-    <form onSubmit={kirim} className="mt-6">
-      <div>
-        <label htmlFor="namaPengguna" className="text-sm font-semibold text-ink">
-          Nama pengguna
-        </label>
-        <input
-          id="namaPengguna"
-          autoComplete="username"
-          autoFocus
-          autoCapitalize="none"
-          spellCheck={false}
-          value={namaPengguna}
-          onChange={(e) => setNamaPengguna(e.target.value)}
-          className={inputKelas}
-        />
-      </div>
+    <form onSubmit={kirim} className="mt-7 space-y-4">
+      <Medan
+        label="Nama pengguna"
+        ikon={User}
+        nilai={namaPengguna}
+        onUbah={setNamaPengguna}
+        autoComplete="username"
+        autoFocus
+        autoCapitalize="none"
+        spellCheck={false}
+        placeholder="Masukkan nama pengguna"
+      />
 
-      <div className="mt-4">
-        <label htmlFor="kode" className="text-sm font-semibold text-ink">
-          Kode pemulihan
-        </label>
-        <input
-          id="kode"
+      <div>
+        <Medan
+          label="Kode pemulihan"
+          ikon={KeyRound}
+          nilai={kode}
+          onUbah={setKode}
           autoCapitalize="characters"
           spellCheck={false}
           placeholder="SYN-XXXX-XXXX-XXXX-XXXX"
-          value={kode}
-          onChange={(e) => setKode(e.target.value)}
-          className={`${inputKelas} tabular tracking-wide`}
+          className="tabular tracking-wide"
         />
         <p className="mt-1.5 text-xs text-muted">
           Huruf besar/kecil dan tanda hubung tidak masalah.
         </p>
       </div>
 
-      <div className="mt-4">
-        <label htmlFor="sandiBaru" className="text-sm font-semibold text-ink">
-          Sandi baru <span className="font-normal text-muted">(minimal 8 karakter)</span>
-        </label>
-        <input
-          id="sandiBaru"
-          type="password"
-          autoComplete="new-password"
-          value={sandiBaru}
-          onChange={(e) => setSandiBaru(e.target.value)}
-          className={inputKelas}
-        />
-      </div>
+      <MedanSandi
+        label={
+          <>
+            Sandi baru{" "}
+            <span className="font-normal text-muted">(minimal 8 karakter)</span>
+          </>
+        }
+        ikon={Lock}
+        nilai={sandiBaru}
+        onUbah={setSandiBaru}
+        autoComplete="new-password"
+        placeholder="Sandi baru Anda"
+      />
 
-      <div className="mt-4">
-        <label htmlFor="ulangiSandi" className="text-sm font-semibold text-ink">
-          Ulangi sandi baru
-        </label>
-        <input
-          id="ulangiSandi"
-          type="password"
-          autoComplete="new-password"
-          value={ulangiSandi}
-          onChange={(e) => setUlangiSandi(e.target.value)}
-          className={inputKelas}
-        />
-      </div>
+      <MedanSandi
+        label="Ulangi sandi baru"
+        ikon={Lock}
+        nilai={ulangiSandi}
+        onUbah={setUlangiSandi}
+        autoComplete="new-password"
+        placeholder="Ulangi sandi baru"
+      />
 
       {error && (
-        <p className="mt-4 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-danger">
+        <p className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-danger">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
@@ -100,11 +91,14 @@ export function FormLupaSandi() {
 
       <button
         type="submit"
-        disabled={pending || !namaPengguna.trim() || !kode.trim() || !sandiBaru || !ulangiSandi}
-        className={tombolKelas}
+        disabled={
+          pending || !namaPengguna.trim() || !kode.trim() || !sandiBaru || !ulangiSandi
+        }
+        className="group flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 to-brand-600 text-[15px] font-bold text-white shadow-[0_16px_30px_-16px_rgba(91,75,224,0.9)] transition-[transform,opacity] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:from-line disabled:to-line disabled:text-muted disabled:shadow-none disabled:hover:translate-y-0"
       >
         {pending && <Loader2 className="size-4 animate-spin" />}
         Pulihkan Akses
+        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
       </button>
     </form>
   );

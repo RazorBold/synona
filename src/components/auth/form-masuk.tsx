@@ -1,10 +1,12 @@
 "use client";
 
-import { Loader2, TriangleAlert } from "lucide-react";
+import { ArrowRight, Loader2, Lock, TriangleAlert, User } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
-import { inputKelas, tombolKelas } from "@/components/auth/kartu-auth";
+import { Medan, MedanSandi } from "@/components/auth/medan";
 import { PilihJenisUsaha } from "@/components/onboarding/pilih-jenis-usaha";
+import { RUTE_LUPA_SANDI } from "@/lib/auth-const";
 import { aman } from "@/lib/aksi";
 import type { JenisUsaha } from "@/lib/usaha";
 import { masuk } from "@/server/actions/auth";
@@ -28,9 +30,7 @@ export function FormMasuk({
     setPending(true);
     setError(null);
 
-    const hasil = await aman(
-      masuk({ namaPengguna, sandi, lanjut, jenisUsaha }),
-    );
+    const hasil = await aman(masuk({ namaPengguna, sandi, lanjut, jenisUsaha }));
     if (!hasil.ok) {
       setError(hasil.error);
       setSandi("");
@@ -39,9 +39,9 @@ export function FormMasuk({
   }
 
   return (
-    <form onSubmit={kirim} className="mt-6">
+    <form onSubmit={kirim} className="mt-7 space-y-4">
       {perluJenisUsaha && (
-        <div className="mb-6">
+        <div className="rounded-2xl bg-canvas p-4">
           <p className="text-sm font-semibold text-ink">
             Usaha Anda yang seperti apa?
           </p>
@@ -57,40 +57,40 @@ export function FormMasuk({
         </div>
       )}
 
-      <div>
-        <label htmlFor="namaPengguna" className="text-sm font-semibold text-ink">
-          Nama pengguna
-        </label>
-        <input
-          id="namaPengguna"
-          name="username"
-          autoComplete="username"
-          autoFocus
-          autoCapitalize="none"
-          spellCheck={false}
-          value={namaPengguna}
-          onChange={(e) => setNamaPengguna(e.target.value)}
-          className={inputKelas}
-        />
-      </div>
+      <Medan
+        label="Nama pengguna"
+        ikon={User}
+        nilai={namaPengguna}
+        onUbah={setNamaPengguna}
+        name="username"
+        autoComplete="username"
+        autoFocus
+        autoCapitalize="none"
+        spellCheck={false}
+        placeholder="Masukkan nama pengguna"
+      />
 
-      <div className="mt-4">
-        <label htmlFor="sandi" className="text-sm font-semibold text-ink">
-          Sandi
-        </label>
-        <input
-          id="sandi"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          value={sandi}
-          onChange={(e) => setSandi(e.target.value)}
-          className={inputKelas}
-        />
+      <MedanSandi
+        label="Sandi"
+        ikon={Lock}
+        nilai={sandi}
+        onUbah={setSandi}
+        name="password"
+        autoComplete="current-password"
+        placeholder="Masukkan sandi"
+      />
+
+      <div className="flex justify-end pt-0.5">
+        <Link
+          href={RUTE_LUPA_SANDI}
+          className="text-[13px] font-semibold text-brand-500 hover:text-brand-600"
+        >
+          Lupa sandi?
+        </Link>
       </div>
 
       {error && (
-        <p className="mt-4 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-danger">
+        <p className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-danger">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
@@ -104,10 +104,11 @@ export function FormMasuk({
           !sandi ||
           (perluJenisUsaha && jenisUsaha === null)
         }
-        className={tombolKelas}
+        className="group flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 to-brand-600 text-[15px] font-bold text-white shadow-[0_16px_30px_-16px_rgba(91,75,224,0.9)] transition-[transform,opacity] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:from-line disabled:to-line disabled:text-muted disabled:shadow-none disabled:hover:translate-y-0"
       >
         {pending && <Loader2 className="size-4 animate-spin" />}
         Masuk
+        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
       </button>
     </form>
   );
