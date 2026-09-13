@@ -8,7 +8,7 @@ import { aman } from "@/lib/aksi";
 import { businessDate, tambahHari } from "@/lib/date";
 import { metodeAkun } from "@/lib/kas";
 import { formatRupiah } from "@/lib/money";
-import { LABEL_SATUAN_LAYANAN } from "@/lib/usaha";
+import { labelSatuanLayanan } from "@/lib/usaha";
 import { buildWaLink, pesanTandaTerima } from "@/lib/wa";
 import { simpanPesanan } from "@/server/actions/pesanan";
 import type { AkunKas } from "@/server/queries/kas";
@@ -254,7 +254,7 @@ export function PesananBaruDialog({
                           className="tabular h-11 w-full bg-transparent text-right text-sm font-bold text-ink outline-none"
                         />
                         <span className="text-xs font-semibold text-muted">
-                          {l ? LABEL_SATUAN_LAYANAN[l.satuan] : ""}
+                          {l ? labelSatuanLayanan(l.satuan) : ""}
                         </span>
                       </div>
 

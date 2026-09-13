@@ -9,19 +9,23 @@ import {
   Pencil,
   Plus,
   Smartphone,
+  Trash2,
   Wallet,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { AkunKasDialog } from "@/components/kas/akun-kas-dialog";
+import { PemasukanDialog } from "@/components/kas/pemasukan-dialog";
 import { TransferKasDialog } from "@/components/kas/transfer-kas-dialog";
 import { Chip } from "@/components/ui/chip";
 import { IconButton } from "@/components/ui/icon-button";
 import { formatTanggalPendek } from "@/lib/date";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { aman } from "@/lib/aksi";
 import { LABEL_JENIS_AKUN, LABEL_KATEGORI, type JenisAkun } from "@/lib/kas";
+import { hapusPemasukanLain } from "@/server/actions/kas";
 import type { AkunKas, BarisMutasi, SaldoAkun } from "@/server/queries/kas";
 
 const IKON_AKUN: Record<JenisAkun, typeof Wallet> = {
@@ -53,6 +57,7 @@ export function KasClient({
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [pemasukanOpen, setPemasukanOpen] = useState(false);
   const [terpilih, setTerpilih] = useState<AkunKas | null>(null);
 
   const totalSaldo = saldo.reduce((a, s) => a + s.saldoAkhir, 0);
@@ -96,6 +101,14 @@ export function KasClient({
           >
             <Plus className="size-4" strokeWidth={2.6} />
             Tambah Akun
+          </button>
+          <button
+            onClick={() => setPemasukanOpen(true)}
+            disabled={akun.length === 0}
+            className="inline-flex h-12 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 shadow-card transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ArrowDownLeft className="size-4" />
+            Catat Pemasukan
           </button>
           <button
             onClick={() => setTransferOpen(true)}
@@ -274,6 +287,21 @@ export function KasClient({
                 {m.nilai > 0 ? "+" : "−"}
                 {formatRupiah(Math.abs(m.nilai)).replace("Rp ", "Rp ")}
               </p>
+              {/* Hanya pemasukan lain yang bisa dihapus dari sini: baris lain
+                  adalah bayangan dari penjualan/pembelian/beban, dan harus
+                  dibatalkan di menu asalnya supaya stok & kasbon ikut benar. */}
+              {m.kategori === "pemasukan_lain" && (
+                <IconButton
+                  label="Hapus pemasukan"
+                  icon={Trash2}
+                  bahaya
+                  onClick={async () => {
+                    if (!confirm(`Hapus "${m.keterangan}" ${formatRupiah(m.nilai)}?`)) return;
+                    const hasil = await aman(hapusPemasukanLain(m.refId));
+                    if (!hasil.ok) alert(hasil.error);
+                  }}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -299,6 +327,12 @@ export function KasClient({
         onOpenChange={setFormOpen}
         akun={terpilih}
         jumlahAkun={akun.length}
+      />
+      <PemasukanDialog
+        open={pemasukanOpen}
+        onOpenChange={setPemasukanOpen}
+        akun={akun}
+        hariIni={hariIni}
       />
       <TransferKasDialog
         open={transferOpen}

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ChefHat,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -53,8 +52,10 @@ function susunNav(jenis: JenisUsaha): Grup[] {
     pencatatan.push({ href: "/pesanan", label: "Pesanan Jasa", icon: ClipboardList });
   }
   if (barang) {
+    // Menu Produksi sengaja tidak ditampilkan lagi (permintaan pemilik). Data
+    // produksi lama tetap tersimpan dan tetap ikut laporan; hanya pintu
+    // pencatatan barunya yang ditutup.
     pencatatan.push(
-      { href: "/produksi", label: "Produksi", icon: ChefHat },
       { href: "/pembelian", label: "Pembelian Stok", icon: ShoppingCart },
       { href: "/persediaan", label: "Persediaan", icon: Wheat },
     );

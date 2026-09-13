@@ -3,7 +3,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import type { SatuanLayanan } from "@/lib/usaha";
+import type { SatuanEstimasi, SatuanLayanan } from "@/lib/usaha";
 
 export type BarisLayanan = {
   id: string;
@@ -16,6 +16,8 @@ export type BarisLayanan = {
   satuan: SatuanLayanan;
   hargaBisaDiubah: number;
   estimasiJam: number;
+  estimasiNilai: number;
+  estimasiSatuan: SatuanEstimasi;
   dipakai: number;
   omzet30: number;
 };
@@ -34,6 +36,8 @@ export async function getDaftarLayanan(
            s.unit               AS satuan,
            s.harga_bisa_diubah  AS hargaBisaDiubah,
            s.estimasi_jam       AS estimasiJam,
+           s.estimasi_nilai     AS estimasiNilai,
+           s.estimasi_satuan    AS estimasiSatuan,
            (SELECT COUNT(*) FROM transaction_items i
              WHERE i.service_id = s.id)                        AS dipakai,
            COALESCE((SELECT SUM(i.line_total)
@@ -92,7 +96,7 @@ export async function getPendapatanPetugas(
            COALESCE(u.name, 'Belum ditandai')       AS nama,
            COUNT(*)                                 AS jumlahPekerjaan,
            COALESCE(SUM(i.line_total), 0)           AS omzet,
-           COALESCE(SUM(i.price_snapshot - i.cost_snapshot), 0) AS margin
+           COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0) AS margin
       FROM transaction_items i
       JOIN transactions t ON t.id = i.transaction_id
       LEFT JOIN staff st ON st.id = i.petugas_staff_id

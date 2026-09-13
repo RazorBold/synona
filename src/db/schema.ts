@@ -258,6 +258,13 @@ export const transactionItems = sqliteTable(
     petugasStaffId: text("petugas_staff_id").references(() => staff.id, {
       onDelete: "set null",
     }),
+    /**
+     * Potongan rupiah untuk SELURUH baris ini (bukan per unit). `line_total`
+     * sudah bersih dari potongan ini, jadi laba baris = line_total −
+     * cost_snapshot × qty — rumus yang sama untuk baris barang maupun jasa.
+     * Kolom ini disimpan hanya supaya struk dan riwayat bisa menampilkannya.
+     */
+    discount: integer("discount").notNull().default(0),
     lineTotal: integer("line_total").notNull(),
   },
   (t) => [
@@ -478,15 +485,22 @@ export const materials = sqliteTable(
       .references(() => outlets.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     /**
-     * Memisahkan apa yang masih harus diolah dari apa yang sudah siap.
-     * "baku" = tepung, gula. "setengah_jadi" = adonan, kaldu yang dimasak
-     * sekali lalu dipakai berhari-hari. "jadi" = barang siap pakai/jual
-     * yang dibeli utuh dari supplier (air mineral, kerupuk kemasan).
+     * "baku" = yang habis terpakai membuat produk (tepung, gula, cat).
+     * "packaging" = pembungkus yang ikut keluar bersama produk (plastik,
+     * dus, cup, label). Dulu ada "setengah_jadi" dan "jadi"; sejak menu
+     * Produksi dihapus keduanya tidak lagi punya arti, dan migrasi 0010
+     * memindahkan barisnya ke "baku".
      */
-    jenis: text("jenis", { enum: ["baku", "setengah_jadi", "jadi"] })
+    jenis: text("jenis", { enum: ["baku", "packaging"] })
       .notNull()
       .default("baku"),
-    unit: text("unit", { enum: ["g", "ml", "pcs"] })
+    /**
+     * Satuan terkecil stok. "g" dan "ml" punya satuan belanja besar (kg,
+     * liter) — lihat src/lib/satuan.ts. Selain itu satuan hitungan bebas
+     * yang ditambahkan pemilik (botol, dus, karung…) dan dihitung apa adanya
+     * seperti pcs, supaya stok integer tidak pernah kehilangan pecahan.
+     */
+    unit: text("unit")
       .notNull()
       .default("g"),
     stock: integer("stock").notNull().default(0),
@@ -664,11 +678,13 @@ export const services = sqliteTable(
     /** Perkiraan biaya bahan pakai per satuan, supaya margin jasa jujur. */
     cost: integer("cost").notNull().default(0),
     /** Satuan penagihan: per potong, per kg cucian, per jam, per m². */
-    unit: text("unit", {
-      enum: ["pcs", "kg", "jam", "hari", "meter", "m2"],
-    })
-      .notNull()
-      .default("pcs"),
+    /**
+     * Satuan penagihan. Bebas ditambah pemilik (lembar, set, paket…) — enum
+     * yang dulu ada terlalu sempit untuk usaha jasa yang beragam. Tidak ada
+     * hitungan yang bergantung pada nama satuannya; jumlahnya selalu disimpan
+     * ×1000 di transaction_items.qty_milli.
+     */
+    unit: text("unit").notNull().default("pcs"),
     /**
      * 1 = kasir boleh menimpa harganya saat menerima pesanan. Untuk servis
      * yang harganya baru ketahuan setelah dibongkar, harga katalog hanya
@@ -677,6 +693,17 @@ export const services = sqliteTable(
     hargaBisaDiubah: integer("harga_bisa_diubah").notNull().default(0),
     /** Perkiraan lama pengerjaan dalam jam, untuk menghitung janji selesai. */
     estimasiJam: integer("estimasi_jam").notNull().default(0),
+    /**
+     * Perkiraan lama kerja seperti yang diketik pemilik: "3 hari", "2
+     * minggu". `estimasi_jam` di atas tetap diisi setara jam (hari = 24,
+     * minggu = 168, bulan = 720) supaya apa pun yang membaca jam tidak rusak.
+     */
+    estimasiNilai: integer("estimasi_nilai").notNull().default(0),
+    estimasiSatuan: text("estimasi_satuan", {
+      enum: ["jam", "hari", "minggu", "bulan"],
+    })
+      .notNull()
+      .default("jam"),
     isActive: integer("is_active").notNull().default(1),
     ...timestamps,
   },
@@ -763,6 +790,42 @@ export const expenses = sqliteTable(
     index("idx_expenses_outlet_date").on(t.outletId, t.businessDate),
     index("idx_expenses_outlet_category").on(t.outletId, t.category),
   ],
+);
+
+/**
+ * Uang masuk yang BUKAN penjualan: setoran modal pemilik, pinjaman, hibah,
+ * dan sejenisnya. Sebelum tabel ini ada, uang semacam itu tidak punya tempat
+ * dicatat, sehingga saldo kas di aplikasi selalu lebih kecil dari uang yang
+ * sebenarnya ada di laci dan rekening.
+ *
+ * Sengaja TIDAK dihitung sebagai omzet atau laba — modal dan pinjaman bukan
+ * pendapatan usaha. Ia hanya menambah saldo akun kas (lihat mutasi() di
+ * src/server/queries/kas.ts).
+ */
+export const otherIncomes = sqliteTable(
+  "other_incomes",
+  {
+    id: id(),
+    outletId: text("outlet_id")
+      .notNull()
+      .references(() => outlets.id, { onDelete: "cascade" }),
+    category: text("category", {
+      enum: ["modal", "pinjaman", "hibah", "lainnya"],
+    })
+      .notNull()
+      .default("lainnya"),
+    name: text("name").notNull(),
+    amount: integer("amount").notNull(),
+    cashAccountId: text("cash_account_id").references(() => cashAccounts.id, {
+      onDelete: "set null",
+    }),
+    occurredAt: integer("occurred_at").notNull(),
+    businessDate: text("business_date").notNull(),
+    note: text("note"),
+    recordedBy: text("recorded_by").references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [index("idx_other_incomes_outlet_date").on(t.outletId, t.businessDate)],
 );
 
 /* ------------------------------------------------------- autentikasi */

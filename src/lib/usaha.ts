@@ -58,18 +58,24 @@ export function punyaJasa(jenis: JenisUsaha | null): boolean {
   return jenis === "jasa" || jenis === "campuran";
 }
 
-export type SatuanLayanan = "pcs" | "kg" | "jam" | "hari" | "meter" | "m2";
+/**
+ * Satuan layanan bebas ditambah pemilik. Nilai bawaan di bawah hanya
+ * pilihan awal; satuan lain ("lembar", "set", "halaman") disimpan apa adanya.
+ */
+export type SatuanLayanan = string;
 
-export const SATUAN_LAYANAN: { key: SatuanLayanan; label: string; ket: string }[] = [
-  { key: "pcs", label: "per item", ket: "potong rambut, servis unit" },
-  { key: "kg", label: "per kg", ket: "laundry kiloan" },
-  { key: "jam", label: "per jam", ket: "sewa, jasa borongan waktu" },
-  { key: "hari", label: "per hari", ket: "sewa harian" },
-  { key: "meter", label: "per meter", ket: "jahit, kabel, kain" },
-  { key: "m2", label: "per m²", ket: "cuci karpet, cat, kaca" },
+export const SATUAN_LAYANAN_BAWAAN: { nilai: string; label: string }[] = [
+  { nilai: "pcs", label: "item" },
+  { nilai: "kg", label: "kg" },
+  { nilai: "jam", label: "jam" },
+  { nilai: "hari", label: "hari" },
+  { nilai: "meter", label: "meter" },
+  { nilai: "m2", label: "m²" },
+  { nilai: "paket", label: "paket" },
+  { nilai: "halaman", label: "halaman" },
 ];
 
-export const LABEL_SATUAN_LAYANAN: Record<SatuanLayanan, string> = {
+const LABEL_SATUAN_LAYANAN: Record<string, string> = {
   pcs: "item",
   kg: "kg",
   jam: "jam",
@@ -77,6 +83,32 @@ export const LABEL_SATUAN_LAYANAN: Record<SatuanLayanan, string> = {
   meter: "m",
   m2: "m²",
 };
+
+/** Label singkat satuan layanan; satuan buatan pemilik ditampilkan apa adanya. */
+export function labelSatuanLayanan(unit: string | null | undefined): string {
+  const u = unit ?? "pcs";
+  return LABEL_SATUAN_LAYANAN[u] ?? u;
+}
+
+export type SatuanEstimasi = "jam" | "hari" | "minggu" | "bulan";
+
+export const SATUAN_ESTIMASI: { nilai: SatuanEstimasi; label: string; jam: number }[] = [
+  { nilai: "jam", label: "jam", jam: 1 },
+  { nilai: "hari", label: "hari", jam: 24 },
+  { nilai: "minggu", label: "minggu", jam: 24 * 7 },
+  { nilai: "bulan", label: "bulan", jam: 24 * 30 },
+];
+
+/** Setara jam — disimpan di `estimasi_jam` untuk apa pun yang masih membaca jam. */
+export function estimasiKeJam(nilai: number, satuan: SatuanEstimasi): number {
+  return nilai * (SATUAN_ESTIMASI.find((s) => s.nilai === satuan)?.jam ?? 1);
+}
+
+/** "± 3 hari" · kosong kalau belum diisi. */
+export function formatEstimasi(nilai: number, satuan: string): string {
+  if (!nilai) return "";
+  return `± ${nilai} ${satuan}`;
+}
 
 export type StatusPesanan = "masuk" | "dikerjakan" | "selesai" | "diambil" | "batal";
 
@@ -138,10 +170,9 @@ export const LABEL_STATUS_PESANAN: Record<StatusPesanan, string> = {
  */
 export function formatJumlahLayanan(
   qtyMilli: number,
-  unit: SatuanLayanan | string | null,
+  unit: string | null,
 ): string {
   const nilai = qtyMilli / 1000;
-  const label =
-    LABEL_SATUAN_LAYANAN[(unit ?? "pcs") as SatuanLayanan] ?? String(unit ?? "");
+  const label = labelSatuanLayanan(unit);
   return `${nilai.toLocaleString("id-ID", { maximumFractionDigits: 3 })} ${label}`;
 }

@@ -60,7 +60,7 @@ export async function getRadar(
                  WHERE outlet_id = ${outletId} AND status != 'void'
                    AND business_date BETWEEN ${awal7} AND ${hariIni}), 0) AS hari7,
       COALESCE((SELECT SUM(
-                  (SELECT COALESCE(SUM((i.price_snapshot - i.cost_snapshot) * i.qty), 0)
+                  (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
                      FROM transaction_items i WHERE i.transaction_id = tx.id) - tx.discount)
                   FROM transactions tx
                  WHERE tx.outlet_id = ${outletId} AND tx.status != 'void'
@@ -76,7 +76,9 @@ export async function getRadar(
         + COALESCE((SELECT SUM(p.amount) FROM debt_payments p
                       JOIN debts d ON d.id = p.debt_id
                      WHERE d.outlet_id = ${outletId}
-                       AND p.paid_at BETWEEN ${batasAwal} AND ${batasAkhir}), 0) AS kasMasuk,
+                       AND p.paid_at BETWEEN ${batasAwal} AND ${batasAkhir}), 0)
+        + COALESCE((SELECT SUM(amount) FROM other_incomes
+                     WHERE outlet_id = ${outletId} AND business_date = ${hariIni}), 0) AS kasMasuk,
       COALESCE((SELECT SUM(paid_amount) FROM purchases
                  WHERE outlet_id = ${outletId} AND business_date = ${hariIni}), 0)
         + COALESCE((SELECT SUM(amount) FROM expenses

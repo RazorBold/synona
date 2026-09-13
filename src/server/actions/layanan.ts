@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { services } from "@/db/schema";
+import { rapikanSatuan } from "@/lib/satuan";
+import { estimasiKeJam } from "@/lib/usaha";
 import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
 
@@ -19,9 +21,13 @@ const LayananInput = z.object({
   kategoriId: z.string().nullable().default(null),
   harga: z.coerce.number().int().min(0, "Harga tidak boleh minus"),
   modal: z.coerce.number().int().min(0).default(0),
-  satuan: z.enum(["pcs", "kg", "jam", "hari", "meter", "m2"]),
+  satuan: z
+    .string()
+    .transform((v) => rapikanSatuan(v))
+    .pipe(z.string().min(1, "Pilih satuan dulu").max(20, "Nama satuan terlalu panjang")),
   hargaBisaDiubah: z.boolean().default(false),
-  estimasiJam: z.coerce.number().int().min(0).max(24 * 90).default(0),
+  estimasiNilai: z.coerce.number().int().min(0).max(999).default(0),
+  estimasiSatuan: z.enum(["jam", "hari", "minggu", "bulan"]).default("jam"),
 });
 
 export async function simpanLayanan(input: unknown): Promise<HasilAksi> {
@@ -52,8 +58,19 @@ export async function simpanLayanan(input: unknown): Promise<HasilAksi> {
       cost: d.modal,
       unit: d.satuan,
       hargaBisaDiubah: d.hargaBisaDiubah ? 1 : 0,
-      estimasiJam: d.estimasiJam,
+      estimasiNilai: d.estimasiNilai,
+      estimasiSatuan: d.estimasiSatuan,
+      estimasiJam: estimasiKeJam(d.estimasiNilai, d.estimasiSatuan),
     };
+
+    // Kategori harus milik outlet ini. Sejak pendaftaran terbuka untuk banyak
+    // usaha, id kategori usaha lain tidak boleh bisa ditempelkan lewat request.
+    if (d.kategoriId) {
+      const milik = db.get<{ id: string }>(sql`
+        SELECT id FROM categories WHERE id = ${d.kategoriId} AND outlet_id = ${outlet.id}
+      `);
+      if (!milik) throw new Error("Kategori tidak ditemukan di outlet ini");
+    }
 
     if (d.id) {
       const ada = db

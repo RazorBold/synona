@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { db } from "@/db";
+import { berskala, rapikanSatuan } from "@/lib/satuan";
 import {
   materialMovements,
   materials,
@@ -26,8 +27,11 @@ export type HasilAksi = { ok: true } | { ok: false; error: string };
 const BahanInput = z.object({
   id: z.string().nullable().default(null),
   nama: z.string().trim().min(2, "Nama bahan minimal 2 huruf").max(80),
-  jenis: z.enum(["baku", "setengah_jadi", "jadi"]).default("baku"),
-  satuan: z.enum(["g", "ml", "pcs"]),
+  jenis: z.enum(["baku", "packaging"]).default("baku"),
+  satuan: z
+    .string()
+    .transform((v) => rapikanSatuan(v))
+    .pipe(z.string().min(1, "Pilih satuan dulu").max(20, "Nama satuan terlalu panjang")),
   batasStok: z.coerce.number().int().min(0).default(0),
   stokAwal: z.coerce.number().int().min(0).default(0),
   hargaAwal: z.coerce.number().int().min(0).default(0),
@@ -49,7 +53,7 @@ export async function simpanBahan(input: unknown): Promise<HasilAksi> {
     db.transaction((tx) => {
       if (d.id) {
         const ada = tx
-          .select({ id: materials.id })
+          .select({ id: materials.id, unit: materials.unit, stock: materials.stock })
           .from(materials)
           .where(
             and(eq(materials.id, d.id), eq(materials.outletId, outlet.id)),
@@ -59,6 +63,17 @@ export async function simpanBahan(input: unknown): Promise<HasilAksi> {
 
         // Stok & harga bahan hanya berubah lewat pembelian/penyesuaian,
         // supaya setiap perubahan punya jejak di material_movements.
+        /*
+         * Satuan tidak boleh diganti selama stok masih ada: angka stok dan
+         * harganya tersimpan DALAM satuan itu. Mengganti "g" jadi "botol"
+         * akan membuat 5.000 gram terbaca sebagai 5.000 botol.
+         */
+        if (ada.unit !== d.satuan && ada.stock !== 0) {
+          throw new Error(
+            "Satuan tidak bisa diganti selama stoknya masih ada. Habiskan atau sesuaikan stok ke 0 dulu.",
+          );
+        }
+
         tx.update(materials)
           .set({
             name: d.nama,
@@ -72,9 +87,12 @@ export async function simpanBahan(input: unknown): Promise<HasilAksi> {
       }
 
       const id = nanoid();
-      // hargaAwal diisi per satuan besar (kg/liter/pcs) -> rupiah x1000 per
-      // satuan terkecil kebetulan bernilai sama untuk g/ml (1 kg = 1000 g).
-      const hargaMilli = d.satuan === "pcs" ? d.hargaAwal * 1000 : d.hargaAwal;
+      // hargaAwal diisi per satuan besar (kg/liter) atau per unit (botol,
+      // pcs, dus…) -> rupiah x1000 per satuan terkecil. Untuk g/ml nilainya
+      // kebetulan sama (1 kg = 1000 g); untuk satuan hitungan dikali 1000.
+      // Cabangnya ditentukan `berskala()`, BUKAN `=== "pcs"` — kalau tidak,
+      // satuan baru seperti "botol" akan tersimpan 1000× terlalu murah.
+      const hargaMilli = berskala(d.satuan) ? d.hargaAwal : d.hargaAwal * 1000;
 
       tx.insert(materials)
         .values({

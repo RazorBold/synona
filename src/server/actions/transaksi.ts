@@ -15,6 +15,7 @@ import {
   transactions,
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
+import { normalisasiNomorHp } from "@/lib/wa";
 import { wajibSesi } from "@/server/auth";
 import { pilihAkunKas } from "@/server/kas";
 import { getOutletAktif } from "@/server/queries/dashboard";
@@ -22,15 +23,24 @@ import { getOutletAktif } from "@/server/queries/dashboard";
 const ItemInput = z.object({
   productId: z.string().min(1),
   qty: z.number().int().positive().max(9999),
+  /** Potongan rupiah untuk seluruh baris. Dijepit ulang di server. */
+  diskon: z.number().int().min(0).default(0),
 });
 
 const TransaksiInput = z.object({
   items: z.array(ItemInput).min(1, "Keranjang masih kosong"),
-  discount: z.number().int().min(0).default(0),
   paymentMethod: z.enum(["cash", "qris", "transfer", "debt"]),
   akunKasId: z.string().nullable().default(null),
   paidAmount: z.number().int().min(0).default(0),
   customerId: z.string().nullable().default(null),
+  /**
+   * Nama pelanggan yang diketik kasir kalau belum ada di daftar. Server
+   * mencocokkannya ke pelanggan yang sudah ada (nama atau nomor sama) dan
+   * baru membuat baris baru kalau memang tidak ada — jadi satu orang tidak
+   * pecah jadi beberapa pelanggan kembar.
+   */
+  namaPelanggan: z.string().trim().max(80).nullable().default(null),
+  teleponPelanggan: z.string().trim().max(24).nullable().default(null),
   dueDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -97,7 +107,11 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           throw new Error(`Stok ${p.name} tinggal ${p.stock} ${p.unit}`);
         }
 
-        const lineTotal = p.price * item.qty;
+        // Diskon dijepit di server: tidak minus, tidak melebihi nilai baris.
+        // Nilai dari klien tidak pernah dipercaya apa adanya (lihat aturan 1).
+        const kotor = p.price * item.qty;
+        const diskon = Math.min(Math.max(0, item.diskon), kotor);
+        const lineTotal = kotor - diskon;
         subtotal += lineTotal;
 
         barisItem.push({
@@ -108,16 +122,22 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           priceSnapshot: p.price,
           costSnapshot: p.cost,
           qty: item.qty,
+          discount: diskon,
           lineTotal,
         });
         ringkasItem.push({ nama: p.name, qty: item.qty, total: lineTotal });
       }
 
-      const discount = Math.min(data.discount, subtotal);
-      const total = subtotal - discount;
+      // Diskon kini per baris dan sudah terpotong di `line_total`, jadi
+      // diskon tingkat transaksi selalu 0. Mengisinya juga akan membuat
+      // potongan terhitung dua kali di rumus laba (line_total − modal − diskon).
+      const discount = 0;
+      const total = subtotal;
 
-      if (data.paymentMethod === "debt" && !data.customerId) {
-        throw new Error("Pilih pelanggan dulu untuk transaksi utang");
+      const customerId = pastikanPelanggan(tx, outlet.id, data);
+
+      if (data.paymentMethod === "debt" && !customerId) {
+        throw new Error("Isi nama pelanggan dulu untuk transaksi utang");
       }
       if (data.paymentMethod === "cash" && data.paidAmount < total) {
         throw new Error("Uang diterima kurang dari total belanja");
@@ -144,7 +164,7 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
         .values({
           id: txId,
           outletId: outlet.id,
-          customerId: data.customerId,
+          customerId,
           invoiceNo,
           subtotal,
           discount,
@@ -205,7 +225,7 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           .values({
             id: nanoid(),
             outletId: outlet.id,
-            customerId: data.customerId!,
+            customerId: customerId!,
             transactionId: txId,
             amount: total,
             paid: 0,
@@ -216,11 +236,11 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           .run();
       }
 
-      const pelanggan = data.customerId
+      const pelanggan = customerId
         ? tx
             .select({ nama: customers.name, phone: customers.phone })
             .from(customers)
-            .where(eq(customers.id, data.customerId))
+            .where(eq(customers.id, customerId))
             .get() ?? null
         : null;
 
@@ -243,4 +263,62 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
     revalidatePath("/");
     revalidatePath("/kasir");
   }
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Menentukan pelanggan transaksi, membuatnya kalau perlu.
+ *
+ * Urutan pencocokan sengaja begini:
+ * 1. id yang dipilih dari daftar — tapi dicek benar-benar milik outlet ini,
+ *    supaya id dari outlet lain tidak bisa diselundupkan lewat request;
+ * 2. nomor HP yang sama — nomor lebih unik daripada nama ("Bu Sri" bisa dua);
+ * 3. nama yang sama (tanpa peduli huruf besar);
+ * 4. kalau semuanya tidak ada, pelanggan baru dibuat.
+ */
+function pastikanPelanggan(
+  tx: Tx,
+  outletId: string,
+  data: { customerId: string | null; namaPelanggan: string | null; teleponPelanggan: string | null },
+): string | null {
+  if (data.customerId) {
+    const milik = tx
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.id, data.customerId), eq(customers.outletId, outletId)))
+      .get();
+    if (!milik) throw new Error("Pelanggan tidak ditemukan di outlet ini");
+    return milik.id;
+  }
+
+  const nama = data.namaPelanggan?.trim();
+  if (!nama) return null;
+
+  const telepon = data.teleponPelanggan?.trim()
+    ? normalisasiNomorHp(data.teleponPelanggan)
+    : null;
+
+  if (telepon) {
+    const samaNomor = tx.get<{ id: string }>(sql`
+      SELECT id FROM customers
+       WHERE outlet_id = ${outletId} AND phone = ${telepon} AND is_active = 1
+       LIMIT 1
+    `);
+    if (samaNomor) return samaNomor.id;
+  }
+
+  const samaNama = tx.get<{ id: string }>(sql`
+    SELECT id FROM customers
+     WHERE outlet_id = ${outletId} AND is_active = 1
+       AND lower(trim(name)) = lower(${nama})
+     LIMIT 1
+  `);
+  if (samaNama) return samaNama.id;
+
+  const id = nanoid();
+  tx.insert(customers)
+    .values({ id, outletId, name: nama, phone: telepon })
+    .run();
+  return id;
 }

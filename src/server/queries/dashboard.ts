@@ -117,7 +117,7 @@ const RINGKASAN_KOSONG: RingkasanHarian = {
  * bukan dari harga produk saat ini (lihat PRD-TEKNIS.md §4.3).
  */
 const labaExpr = sql`
-  (SELECT COALESCE(SUM((i.price_snapshot - i.cost_snapshot) * i.qty), 0)
+  (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
      FROM transaction_items i
     WHERE i.transaction_id = tx.id) - tx.discount
 `;

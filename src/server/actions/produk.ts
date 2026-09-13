@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import fs from "node:fs/promises";
@@ -8,6 +8,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import { db } from "@/db";
+import { rapikanSatuan } from "@/lib/satuan";
 import { products, stockMovements } from "@/db/schema";
 import { JENIS_GAMBAR, MAKS_UKURAN_BYTE } from "@/lib/gambar";
 import { wajibSesi } from "@/server/auth";
@@ -63,7 +64,11 @@ const ProdukInput = z.object({
   stokAwal: z.coerce.number().int().min(0).default(0),
   lacakStok: z.coerce.number().int().min(0).max(1).default(1),
   batasStok: z.coerce.number().int().min(0).default(5),
-  unit: z.string().trim().min(1).max(12).default("pcs"),
+  unit: z
+    .string()
+    .transform((v) => rapikanSatuan(v))
+    .pipe(z.string().min(1, "Pilih satuan dulu").max(20, "Nama satuan terlalu panjang"))
+    .default("pcs"),
 });
 
 /**
@@ -140,6 +145,15 @@ export async function simpanProduk(formData: FormData): Promise<HasilAksi> {
 
   try {
     db.transaction((tx) => {
+      // Kategori harus milik outlet ini — id kategori usaha lain tidak boleh
+      // bisa ditempelkan lewat request.
+      if (d.kategoriId) {
+        const milik = tx.get<{ id: string }>(sql`
+          SELECT id FROM categories WHERE id = ${d.kategoriId} AND outlet_id = ${outlet.id}
+        `);
+        if (!milik) throw new Error("Kategori tidak ditemukan di outlet ini");
+      }
+
       if (d.id) {
         tx.update(products)
           .set({

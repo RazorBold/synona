@@ -8,6 +8,8 @@ export type RingkasanKas = {
   tanggal: string;
   penjualanTunai: number;
   cicilanTunai: number;
+  /** Pemasukan lain yang masuk ke akun berjenis kas (uang laci). */
+  pemasukanTunai: number;
   pembelianTunai: number;
   bebanTunai: number;
   hutangTunai: number;
@@ -37,6 +39,7 @@ export async function getRingkasanKas(
     pembelian: number;
     beban: number;
     hutang: number;
+    lain: number;
   }>(sql`
     SELECT
       COALESCE((SELECT SUM(total) FROM transactions
@@ -64,7 +67,11 @@ export async function getRingkasanKas(
       COALESCE((SELECT SUM(pp.amount) FROM payable_payments pp
                   JOIN purchases pu ON pu.id = pp.purchase_id
                  WHERE pu.outlet_id = ${outletId} AND pp.method = 'cash'
-                   AND pp.paid_at BETWEEN ${awal} AND ${akhir}), 0) AS hutang
+                   AND pp.paid_at BETWEEN ${awal} AND ${akhir}), 0) AS hutang,
+      COALESCE((SELECT SUM(oi.amount) FROM other_incomes oi
+                  JOIN cash_accounts a ON a.id = oi.cash_account_id
+                 WHERE oi.outlet_id = ${outletId} AND a.type = 'kas'
+                   AND oi.business_date = ${tanggal}), 0) AS lain
   `);
 
   const penjualanTunai = r?.tunai ?? 0;
@@ -72,16 +79,23 @@ export async function getRingkasanKas(
   const pembelianTunai = r?.pembelian ?? 0;
   const bebanTunai = r?.beban ?? 0;
   const hutangTunai = r?.hutang ?? 0;
+  const pemasukanTunai = r?.lain ?? 0;
 
   return {
     tanggal,
     penjualanTunai,
     cicilanTunai,
+    pemasukanTunai,
     pembelianTunai,
     bebanTunai,
     hutangTunai,
     kasSistem:
-      penjualanTunai + cicilanTunai - pembelianTunai - bebanTunai - hutangTunai,
+      penjualanTunai +
+      cicilanTunai +
+      pemasukanTunai -
+      pembelianTunai -
+      bebanTunai -
+      hutangTunai,
     qrisSistem: r?.qris ?? 0,
     transferSistem: r?.transfer ?? 0,
     jumlahTransaksi: r?.jumlah ?? 0,

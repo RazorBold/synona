@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   NAMA_COOKIE_SESI,
   RUTE_BERANDA,
+  RUTE_DAFTAR,
   RUTE_LUPA_SANDI,
   RUTE_MASUK,
 } from "@/lib/auth-const";
@@ -24,9 +25,12 @@ export async function middleware(req: NextRequest) {
   // Halaman yang HARUS bisa dibuka tanpa sesi. /lupa-sandi termasuk: kalau
   // tidak, orang yang lupa sandinya justru dilempar ke /masuk terus-menerus.
   // /beranda adalah halaman depan publik — ia memang untuk orang yang belum
-  // punya akun sama sekali.
+  // punya akun sama sekali. /register juga: pendaftaran usaha baru terbuka
+  // untuk siapa pun yang belum punya sesi. Yang sudah masuk dipantulkan ke
+  // dashboard oleh halaman itu sendiri — lihat src/app/register/page.tsx.
   if (
     pathname === RUTE_MASUK ||
+    pathname === RUTE_DAFTAR ||
     pathname === RUTE_LUPA_SANDI ||
     pathname === RUTE_BERANDA
   ) {

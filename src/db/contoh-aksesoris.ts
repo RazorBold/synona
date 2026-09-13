@@ -328,9 +328,9 @@ const bahanSeed = [
   { name: "Cairan Pembersih IPA", jenis: "baku" as const, unit: "ml" as const, stock: 2_400, milli: 120, batas: 500 },
   { name: "Kain Microfiber", jenis: "baku" as const, unit: "pcs" as const, stock: 60, milli: 3_500_000, batas: 15 },
   { name: "Lem Perekat LCD", jenis: "baku" as const, unit: "ml" as const, stock: 180, milli: 2_500, batas: 60 },
-  { name: "Anting Steril Sekali Pakai", jenis: "jadi" as const, unit: "pcs" as const, stock: 90, milli: 9_000_000, batas: 20 },
-  { name: "Plastik Kemasan Kecil", jenis: "jadi" as const, unit: "pcs" as const, stock: 350, milli: 250_000, batas: 100 },
-  { name: "Cairan Poles Siap Pakai", jenis: "setengah_jadi" as const, unit: "ml" as const, stock: 600, milli: 400, batas: 150 },
+  { name: "Anting Steril Sekali Pakai", jenis: "baku" as const, unit: "pcs" as const, stock: 90, milli: 9_000_000, batas: 20 },
+  { name: "Plastik Kemasan Kecil", jenis: "packaging" as const, unit: "pcs" as const, stock: 350, milli: 250_000, batas: 100 },
+  { name: "Cairan Poles Siap Pakai", jenis: "baku" as const, unit: "ml" as const, stock: 600, milli: 400, batas: 150 },
 ];
 
 const bahan = bahanSeed.map((b) => ({

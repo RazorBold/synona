@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { cashAccounts, cashTransfers } from "@/db/schema";
+import { cashAccounts, cashTransfers, otherIncomes } from "@/db/schema";
 import { businessDate } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
@@ -191,6 +191,79 @@ export async function hapusTransferKas(id: string): Promise<HasilAksi> {
       .where(
         and(eq(cashTransfers.id, id), eq(cashTransfers.outletId, outlet.id)),
       )
+      .run();
+  } catch (e) {
+    return { ok: false, error: pesan(e) };
+  }
+
+  revalidateKas();
+  return { ok: true };
+}
+
+/* ------------------------------------------------- pemasukan lain */
+
+const PemasukanInput = z.object({
+  kategori: z.enum(["modal", "pinjaman", "hibah", "lainnya"]),
+  nama: z.string().trim().min(2, "Keterangan minimal 2 huruf").max(80),
+  jumlah: z.coerce.number().int().positive("Jumlah harus lebih dari 0").max(10_000_000_000),
+  akunId: z.string().min(1, "Pilih akun tujuan uangnya"),
+  tanggal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
+  catatan: z.string().trim().max(200).nullable().default(null),
+});
+
+/**
+ * Mencatat uang masuk yang bukan penjualan (modal, pinjaman, hibah).
+ *
+ * Hanya menambah saldo akun kas — sengaja tidak menyentuh omzet atau laba,
+ * karena modal dan pinjaman bukan pendapatan usaha. Kalau dicampur dengan
+ * penjualan, laporan "untung" akan melonjak palsu setiap pemilik menyetor
+ * uang pribadinya.
+ */
+export async function simpanPemasukanLain(input: unknown): Promise<HasilAksi> {
+  await wajibSesi();
+  const parsed = PemasukanInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };
+  }
+  const d = parsed.data;
+  const outlet = await getOutletAktif();
+
+  try {
+    const milik = db.get<{ id: string }>(sql`
+      SELECT id FROM cash_accounts
+       WHERE id = ${d.akunId} AND outlet_id = ${outlet.id} AND is_active = 1
+    `);
+    if (!milik) throw new Error("Akun tidak ditemukan di outlet ini");
+
+    db.insert(otherIncomes)
+      .values({
+        id: nanoid(),
+        outletId: outlet.id,
+        category: d.kategori,
+        name: d.nama,
+        amount: d.jumlah,
+        cashAccountId: d.akunId,
+        note: d.catatan,
+        occurredAt: Date.now(),
+        businessDate: d.tanggal,
+        recordedBy: outlet.ownerId,
+      })
+      .run();
+  } catch (e) {
+    return { ok: false, error: pesan(e) };
+  }
+
+  revalidateKas();
+  return { ok: true };
+}
+
+export async function hapusPemasukanLain(id: string): Promise<HasilAksi> {
+  await wajibSesi();
+  const outlet = await getOutletAktif();
+
+  try {
+    db.delete(otherIncomes)
+      .where(and(eq(otherIncomes.id, id), eq(otherIncomes.outletId, outlet.id)))
       .run();
   } catch (e) {
     return { ok: false, error: pesan(e) };

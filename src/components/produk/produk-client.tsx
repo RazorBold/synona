@@ -380,6 +380,7 @@ export function ProdukClient({
         onOpenChange={setFormOpen}
         kategori={kategori}
         produk={terpilih}
+        satuanTerpakai={[...new Set(produk.map((p) => p.unit))]}
       />
       <StokDialog
         open={stokOpen}

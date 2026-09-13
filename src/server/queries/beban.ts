@@ -103,7 +103,7 @@ export async function getStatistikBeban(
   const labaKotor = db.get<{ omzet: number; laba: number }>(sql`
     SELECT COALESCE(SUM(tx.total), 0) AS omzet,
            COALESCE(SUM(
-             (SELECT COALESCE(SUM((i.price_snapshot - i.cost_snapshot) * i.qty), 0)
+             (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
                 FROM transaction_items i WHERE i.transaction_id = tx.id) - tx.discount
            ), 0) AS laba
       FROM transactions tx
