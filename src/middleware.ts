@@ -8,6 +8,7 @@ import {
   RUTE_MASUK,
 } from "@/lib/auth-const";
 import { bacaToken } from "@/lib/jwt";
+import { RUTE_JEJAK } from "@/lib/trafik";
 
 /**
  * Lapisan pertama: memblokir navigasi tanpa JWT sesi yang sah.
@@ -34,6 +35,20 @@ export async function middleware(req: NextRequest) {
     pathname === RUTE_LUPA_SANDI ||
     pathname === RUTE_BERANDA
   ) {
+    return NextResponse.next();
+  }
+
+  // Nota digital yang dituju QR code di nota cetak: dibuka pembeli yang
+  // tentu tidak punya sesi. Halamannya sendiri menolak (404) tanpa tanda
+  // tangan `k` yang cocok — lihat src/app/nota/[id]/page.tsx.
+  if (pathname.startsWith("/nota/") && req.method === "GET") {
+    return NextResponse.next();
+  }
+
+  // Penerima jejak trafik halaman depan: pengirimnya justru pengunjung yang
+  // belum punya sesi. Hanya menerima tulisan berskema ketat dan tidak pernah
+  // mengembalikan data — lihat src/app/api/jejak/route.ts.
+  if (pathname === RUTE_JEJAK) {
     return NextResponse.next();
   }
 

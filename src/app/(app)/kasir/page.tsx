@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { PosClient } from "@/components/pos/pos-client";
+import { TombolPrinter } from "@/components/pos/printer-dialog";
 import { businessDate, formatTanggalPanjang } from "@/lib/date";
+import { urlGambar } from "@/lib/gambar";
 import { formatRupiah } from "@/lib/money";
 import { punyaBarang } from "@/lib/usaha";
 import {
@@ -24,7 +26,7 @@ export default async function KasirPage() {
   const hariIni = businessDate(new Date(), outlet.timezone);
 
   const [produk, kategori, pelanggan, ringkasan] = await Promise.all([
-    getProdukPos(outlet.id),
+    getProdukPos(outlet.id, hariIni),
     getKategoriPos(outlet.id),
     getPelangganPos(outlet.id),
     getRingkasanTanggal(outlet.id, hariIni),
@@ -43,6 +45,7 @@ export default async function KasirPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <TombolPrinter />
           <Ringkas label="Transaksi hari ini" nilai={String(ringkasan.jumlahTransaksi)} />
           <Ringkas
             label="Penjualan hari ini"
@@ -60,6 +63,8 @@ export default async function KasirPage() {
         kategori={kategori}
         pelanggan={pelanggan}
         namaToko={outlet.name}
+        qris={urlGambar(outlet.qrisGambar)}
+        pajak={{ nama: outlet.pajakNama, bp: outlet.pajakBp, mode: outlet.pajakMode }}
       />
     </div>
   );

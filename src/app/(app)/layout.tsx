@@ -2,14 +2,18 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { redirect } from "next/navigation";
 
+import { AsistenChat } from "@/components/asisten/asisten-chat";
 import { BannerSandiDefault } from "@/components/auth/banner-sandi-default";
 import { BannerMasaPaket } from "@/components/layout/banner-masa-paket";
 import { AppShell } from "@/components/layout/app-shell";
 import { SetupJenisUsaha } from "@/components/onboarding/setup-jenis-usaha";
 import { RUTE_GANTI_SANDI, RUTE_SESI_BERAKHIR } from "@/lib/auth-const";
+import { statusLangganan } from "@/lib/paket";
 import { akunSesi, sesiSaatIni } from "@/server/auth";
 import { getOutletAktif } from "@/server/queries/dashboard";
+import { daftarPertanyaan } from "@/server/queries/asisten";
 import { getStatistikPengingat } from "@/server/queries/pengingat";
+import { adminPlatform } from "@/server/langganan";
 
 // Semua halaman di grup ini membaca SQLite pada tiap permintaan.
 export const dynamic = "force-dynamic";
@@ -30,7 +34,15 @@ export default async function AppLayout({
   if (!akun) redirect(RUTE_SESI_BERAKHIR);
   if (akun.harusGantiSandi) redirect(RUTE_GANTI_SANDI);
 
+  // Pengelola platform tidak punya usaha untuk dikelola — area kerjanya
+  // /admin (akun, langganan, trafik), bukan kasir dan stok.
+  if (adminPlatform(sesi)) redirect("/admin");
+
   const outlet = await getOutletAktif();
+
+  // Pendaftar yang belum membayar hanya boleh sampai halaman checkout.
+  const langganan = statusLangganan(outlet);
+  if (langganan === "belum-aktif") redirect("/langganan");
 
   /**
    * Jenis usaha normalnya sudah dipilih di halaman masuk. Yang tersisa di
@@ -73,9 +85,21 @@ export default async function AppLayout({
       jumlahNotifikasi={pengingat.menunggu}
       waBantuan={waBantuan}
     >
+      {/* Penanda untuk `aman()`: pesan galat server action tersembunyi di
+          build produksi, jadi klien perlu tahu sebab penolakannya. */}
+      {langganan === "habis" && <span data-langganan-habis hidden />}
+      <AsistenChat
+        pertanyaan={daftarPertanyaan(outlet.jenisUsaha)}
+        namaPemilik={akun.nama}
+      />
+
       {akun.sandiMasihDefault && <BannerSandiDefault />}
       {sisaHariPaket !== null && sisaHariPaket <= 7 && (
-        <BannerMasaPaket sisaHari={sisaHariPaket} />
+        <BannerMasaPaket
+          sisaHari={sisaHariPaket}
+          hanyaBaca={langganan === "habis"}
+          wajibBayar={langganan !== "bebas"}
+        />
       )}
       {children}
     </AppShell>

@@ -43,7 +43,8 @@ export async function getArusKas(
     lain: number;
   }>(sql`
     SELECT
-      COALESCE((SELECT SUM(total) FROM transactions
+      COALESCE((SELECT SUM(total + CASE WHEN tax_mode = 'tambah' THEN tax_amount ELSE 0 END)
+                  FROM transactions
                  WHERE outlet_id = ${outletId} AND status = 'paid'
                    AND business_date BETWEEN ${dari} AND ${sampai}), 0) AS penjualan,
       COALESCE((SELECT SUM(p.amount) FROM debt_payments p
@@ -116,6 +117,7 @@ export async function getKesehatanKeuangan(
            COALESCE(SUM(
              (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
                 FROM transaction_items i WHERE i.transaction_id = tx.id) - tx.discount
+             - CASE WHEN tx.tax_mode = 'termasuk' THEN tx.tax_amount ELSE 0 END
            ), 0) AS laba,
            COALESCE(SUM(
              (SELECT COALESCE(SUM(i.cost_snapshot * i.qty), 0)

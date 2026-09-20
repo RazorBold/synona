@@ -18,6 +18,7 @@ export function LangkahSection() {
   return (
     <section
       id="cara-kerja"
+      data-jejak-bagian="cara-kerja"
       className="relative scroll-mt-24 overflow-hidden bg-[linear-gradient(180deg,#f3f8ff_0%,#eef5fe_60%,#f4f8ff_100%)] py-20 lg:py-24"
     >
       {/* Latar: lingkaran biru pucat di pojok + gelombang putih di bawah,

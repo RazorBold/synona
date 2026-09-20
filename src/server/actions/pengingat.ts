@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { reminders } from "@/db/schema";
 import { businessDate, tambahHari } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletAktif, getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true; jumlah?: number } | { ok: false; error: string };
 
@@ -176,7 +176,7 @@ export async function ubahStatusPengingat(input: unknown): Promise<HasilAksi> {
   const parsed = UbahStatus.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Data tidak valid" };
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.update(reminders)

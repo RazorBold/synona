@@ -4,7 +4,9 @@ import { PackageX, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { GambarProduk } from "@/components/ui/gambar-produk";
+import { persenDiskon } from "@/lib/diskon";
 import { formatRupiah } from "@/lib/money";
+import { useMuatBertahap } from "@/lib/muat-bertahap";
 import { cn } from "@/lib/utils";
 import type { ProdukPos } from "@/server/queries/pos";
 import { useCart } from "@/store/cart";
@@ -33,6 +35,14 @@ export function ProductGrid({ produk, kategori }: Props) {
       return cocokKategori && cocokCari;
     });
   }, [produk, cari, kategoriAktif]);
+
+  // Daftar panjang dirender bertahap; lihat useMuatBertahap.
+  const { batas, penanda, selesai } = useMuatBertahap(
+    `${kategoriAktif ?? ""}|${cari.trim().toLowerCase()}`,
+    hasil.length,
+    24,
+  );
+  const tampil = hasil.slice(0, batas);
 
   return (
     // min-w-0 wajib: sebagai grid item, lebar section akan mengikuti konten
@@ -83,7 +93,7 @@ export function ProductGrid({ produk, kategori }: Props) {
         </div>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-          {hasil.map((p) => {
+          {tampil.map((p, i) => {
             const diKeranjang = qtyDiKeranjang.get(p.id) ?? 0;
             // Produk tanpa lacak stok tidak pernah habis dan tidak pernah penuh.
             const dilacak = p.lacakStok === 1;
@@ -105,6 +115,8 @@ export function ProductGrid({ produk, kategori }: Props) {
                     stok: p.stok,
                     lacakStok: p.lacakStok,
                     unit: p.unit,
+                    promoBp: p.promoBp,
+                    promoNama: p.promoNama,
                   })
                 }
                 className={cn(
@@ -114,18 +126,30 @@ export function ProductGrid({ produk, kategori }: Props) {
                     : "hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card active:translate-y-0",
                 )}
               >
-                <div className="relative aspect-[4/3]">
+                {/* Persegi, bukan 4:3: foto kemasan kebanyakan tegak atau
+                    persegi, jadi kotak persegi + object-contain menampilkannya
+                    paling besar tanpa memotong apa pun. */}
+                <div className="relative aspect-square">
                   <GambarProduk
                     gambar={p.gambar}
                     emoji={p.emoji}
                     nama={p.nama}
                     className="size-full"
                     ukuranEmoji="text-[32px]"
+                    perluLebar={192}
+                    // Baris pertama kartu sudah terlihat tanpa menggulir.
+                    prioritas={i < 5}
                   />
 
                   {diKeranjang > 0 && (
                     <span className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-400 text-[11px] font-bold text-white shadow-pop">
                       {diKeranjang}
+                    </span>
+                  )}
+
+                  {p.promoBp > 0 && !habis && (
+                    <span className="absolute left-1.5 top-1.5 rounded-lg bg-rose-500 px-1.5 py-0.5 text-[10px] font-extrabold text-white shadow-pop">
+                      −{persenDiskon(p.promoBp)}
                     </span>
                   )}
 
@@ -141,8 +165,17 @@ export function ProductGrid({ produk, kategori }: Props) {
                 </p>
 
                 <div className="mt-1 flex items-baseline justify-between gap-1">
-                  <span className="tabular text-sm font-bold text-brand-600">
-                    {formatRupiah(p.harga)}
+                  <span className="min-w-0">
+                    {p.promoBp > 0 && (
+                      <span className="tabular mr-1.5 text-[11px] text-muted line-through">
+                        {formatRupiah(p.harga)}
+                      </span>
+                    )}
+                    <span className="tabular text-sm font-bold text-brand-600">
+                      {formatRupiah(
+                        p.harga - Math.round((p.harga * p.promoBp) / 10_000),
+                      )}
+                    </span>
                   </span>
                   {dilacak ? (
                     <span
@@ -163,6 +196,15 @@ export function ProductGrid({ produk, kategori }: Props) {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Penanda "muat lagi" + hitungan, supaya jelas daftarnya belum habis. */}
+      {hasil.length > 0 && (
+        <div ref={penanda} className="pt-4 text-center text-xs text-muted">
+          {selesai
+            ? hasil.length > 24 && `${hasil.length} produk ditampilkan`
+            : `Memuat produk lain… (${tampil.length} dari ${hasil.length})`}
         </div>
       )}
     </section>

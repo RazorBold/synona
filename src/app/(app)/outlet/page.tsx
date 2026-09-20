@@ -36,6 +36,11 @@ export default async function OutletPage() {
         telepon: pemilik.telepon,
         paket: pemilik.paket,
       }}
+      pembayaran={{
+        namaOutlet: aktif.name,
+        qris: aktif.qrisGambar,
+        pajak: { nama: aktif.pajakNama, bp: aktif.pajakBp, mode: aktif.pajakMode },
+      }}
       berlakuSampai={
         pemilik.berlakuSampai
           ? format(new Date(pemilik.berlakuSampai), "d MMMM yyyy", {

@@ -4,12 +4,20 @@ import Link from "next/link";
 /**
  * Peringatan masa langganan.
  *
- * SENGAJA hanya memperingatkan, tidak mengunci aplikasi. Mengunci pemilik dari
- * data penjualannya sendiri karena langganan lewat adalah keputusan bisnis,
- * bukan keputusan teknis — dan kalau salah, akibatnya kasir berhenti jalan di
- * tengah jam ramai. Penegakan keras menunggu keputusan pemilik produk.
+ * Untuk usaha berlangganan berbayar (`wajibBayar`), langganan yang lewat
+ * membuat aplikasi HANYA-BACA: data tetap bisa dilihat, tapi server action
+ * yang mengubah data menolak (lihat `getOutletMenulis`). Akun lama dari
+ * sebelum ada pembayaran tetap hanya diperingatkan, tidak dikunci.
  */
-export function BannerMasaPaket({ sisaHari }: { sisaHari: number }) {
+export function BannerMasaPaket({
+  sisaHari,
+  hanyaBaca = false,
+  wajibBayar = false,
+}: {
+  sisaHari: number;
+  hanyaBaca?: boolean;
+  wajibBayar?: boolean;
+}) {
   const lewat = sisaHari < 0;
 
   return (
@@ -32,11 +40,14 @@ export function BannerMasaPaket({ sisaHari }: { sisaHari: number }) {
               : `Masa langganan tinggal ${sisaHari} hari`}
         </p>
         <p className="mt-0.5 text-sm text-ink-soft">
-          Aplikasi masih bisa dipakai seperti biasa. Perpanjang supaya tidak ada
-          gangguan di kemudian hari.
+          {hanyaBaca
+            ? "Data Anda aman dan tetap bisa dilihat, tapi transaksi baru belum bisa dicatat sampai langganan diperpanjang."
+            : wajibBayar
+              ? "Perpanjang sebelum berakhir supaya kasir tidak terhenti — sisa hari tidak hangus."
+              : "Aplikasi masih bisa dipakai seperti biasa. Perpanjang supaya tidak ada gangguan di kemudian hari."}
         </p>
-        <Link href="/pengaturan/paket" className="link-more mt-2">
-          Lihat paket <ChevronRight className="size-3.5" />
+        <Link href={wajibBayar ? "/langganan" : "/pengaturan/paket"} className="link-more mt-2">
+          {wajibBayar ? "Perpanjang sekarang" : "Lihat paket"} <ChevronRight className="size-3.5" />
         </Link>
       </div>
     </div>

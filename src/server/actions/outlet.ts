@@ -5,8 +5,13 @@ import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import fs from "node:fs/promises";
+import path from "node:path";
+
 import { db } from "@/db";
 import { outlets, pengguna, staff, users } from "@/db/schema";
+import { JENIS_GAMBAR, MAKS_UKURAN_BYTE } from "@/lib/gambar";
+import { BP_MAKS } from "@/lib/pajak";
 import { PAKET, type Paket } from "@/lib/paket";
 import { normalisasiNomorHp } from "@/lib/wa";
 import {
@@ -16,7 +21,7 @@ import {
   wajibSesi,
 } from "@/server/auth";
 import { buatAkunKasBawaan } from "@/server/kas";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletAktif, getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -43,7 +48,7 @@ export async function simpanOutlet(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const aktif = await getOutletAktif();
+  const aktif = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -171,7 +176,7 @@ export async function simpanStaf(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const aktif = await getOutletAktif();
+  const aktif = await getOutletMenulis();
   const telepon = d.telepon ? normalisasiNomorHp(d.telepon) : null;
 
   const namaPengguna = d.namaPengguna?.trim().toLowerCase() || null;
@@ -396,7 +401,7 @@ function sinkronkanAkun(
 /** Staf dinonaktifkan, bukan dihapus — transaksi lama menunjuk ke barisnya. */
 export async function nonaktifkanStaf(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const aktif = await getOutletAktif();
+  const aktif = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -448,7 +453,7 @@ export async function simpanProfilPemilik(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const aktif = await getOutletAktif();
+  const aktif = await getOutletMenulis();
 
   try {
     db.update(users)
@@ -506,5 +511,81 @@ export async function simpanJenisUsaha(input: unknown): Promise<HasilAksi> {
   }
 
   revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/* ------------------------------------------------ QRIS & pajak outlet */
+
+const DIR_GAMBAR = process.env.UPLOAD_DIR ?? "./data/uploads/produk";
+const EKSTENSI_GAMBAR: Record<string, string> = {
+  "image/webp": ".webp",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+};
+
+/**
+ * QRIS dan pajak outlet yang sedang aktif.
+ *
+ * QRIS disimpan apa adanya (tidak dikompres ulang): pola QR yang sudah
+ * terlanjur buram tidak bisa dipindai, dan itu berarti pembeli gagal bayar.
+ */
+export async function simpanPembayaranOutlet(formData: FormData): Promise<HasilAksi> {
+  try {
+    const aktif = await getOutletMenulis();
+
+    const pajakNama = String(formData.get("pajakNama") ?? "").trim().slice(0, 24);
+    const pajakAktifDiminta = String(formData.get("pajakAktif") ?? "") === "1";
+    // Persen datang sebagai teks ("0,5" / "11") lalu jadi basis poin.
+    const persen = Number(String(formData.get("pajakPersen") ?? "0").replace(",", "."));
+    if (pajakAktifDiminta) {
+      if (!pajakNama) throw new Error("Isi nama pajaknya, misalnya PPh atau PPN");
+      if (!Number.isFinite(persen) || persen <= 0) throw new Error("Isi tarif pajak lebih dari 0");
+      if (Math.round(persen * 100) > BP_MAKS) throw new Error("Tarif pajak maksimal 50%");
+    }
+    const mode = String(formData.get("pajakMode") ?? "termasuk") === "tambah" ? "tambah" : "termasuk";
+
+    const berkas = formData.get("qris");
+    let qrisBaru: string | null = null;
+    if (berkas instanceof File && berkas.size > 0) {
+      if (!JENIS_GAMBAR.includes(berkas.type)) {
+        throw new Error("Format QRIS harus WebP, JPG, atau PNG");
+      }
+      if (berkas.size > MAKS_UKURAN_BYTE) throw new Error("Ukuran gambar QRIS maksimal 2 MB");
+      await fs.mkdir(DIR_GAMBAR, { recursive: true });
+      qrisBaru = `${nanoid()}${EKSTENSI_GAMBAR[berkas.type]}`;
+      await fs.writeFile(
+        path.join(DIR_GAMBAR, qrisBaru),
+        Buffer.from(await berkas.arrayBuffer()),
+      );
+    }
+    const hapusQris = String(formData.get("hapusQris") ?? "") === "1";
+
+    const lama = db
+      .select({ qris: outlets.qrisGambar })
+      .from(outlets)
+      .where(eq(outlets.id, aktif.id))
+      .get();
+
+    db.update(outlets)
+      .set({
+        pajakNama: pajakAktifDiminta ? pajakNama : null,
+        pajakBp: pajakAktifDiminta ? Math.round(persen * 100) : 0,
+        pajakMode: mode,
+        ...(qrisBaru || hapusQris ? { qrisGambar: qrisBaru } : {}),
+      })
+      .where(eq(outlets.id, aktif.id))
+      .run();
+
+    // Berkas lama dibuang setelah barisnya berhasil diubah, bukan sebelum:
+    // kalau update gagal, gambarnya masih ada dan layar bayar tetap jalan.
+    if ((qrisBaru || hapusQris) && lama?.qris) {
+      await fs.unlink(path.join(DIR_GAMBAR, lama.qris)).catch(() => {});
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Gagal menyimpan" };
+  }
+
+  revalidatePath("/outlet");
+  revalidatePath("/kasir");
   return { ok: true };
 }

@@ -19,7 +19,7 @@ const IKON: StaticImageData[] = [ikon1, ikon2, ikon3, ikon4, ikon5, ikon6];
 
 export function FiturSection() {
   return (
-    <section id="fitur" className="relative scroll-mt-24 overflow-hidden bg-white py-20 lg:py-24">
+    <section id="fitur" data-jejak-bagian="fitur" className="relative scroll-mt-24 overflow-hidden bg-white py-20 lg:py-24">
       {/* Lingkaran biru pucat di tepi, meniru mockup. Dipudarkan ke bawah:
           tanpa itu, lingkaran bawah terpotong garis lurus di batas section. */}
       <div

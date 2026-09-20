@@ -112,6 +112,7 @@ export function JenisUsahaSection() {
   return (
     <section
       id="jenis-usaha"
+      data-jejak-bagian="jenis-usaha"
       className="relative scroll-mt-24 overflow-hidden bg-[linear-gradient(180deg,#eaf3fe_0%,#f1f7fe_100%)]"
     >
       <div

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 
 const KategoriInput = z.object({
   nama: z.string().trim().min(2, "Nama kategori minimal 2 huruf").max(40),
@@ -32,7 +32,7 @@ export async function tambahKategori(input: unknown): Promise<HasilKategori> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };
   }
   const nama = parsed.data.nama.replace(/\s+/g, " ");
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     const hasil = db.transaction((tx) => {

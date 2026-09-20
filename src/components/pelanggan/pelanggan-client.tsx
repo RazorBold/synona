@@ -26,6 +26,7 @@ import { buildWaLink, pesanPengingatUtang } from "@/lib/wa";
 import { arsipkanPelanggan } from "@/server/actions/pelanggan";
 import type { BarisPelanggan } from "@/server/queries/pelanggan";
 import { aman } from "@/lib/aksi";
+import { persenDiskon } from "@/lib/diskon";
 
 type Statistik = {
   jumlah: number;
@@ -218,8 +219,13 @@ export function PelangganClient({
                     <div className="flex items-center gap-3">
                       <AvatarInisial nama={p.nama} />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">
+                        <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink">
                           {p.nama}
+                          {p.diskonBp > 0 && (
+                            <span className="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-600">
+                              −{persenDiskon(p.diskonBp)}
+                            </span>
+                          )}
                         </p>
                         {p.catatan && (
                           <p className="truncate text-xs text-muted">

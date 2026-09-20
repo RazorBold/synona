@@ -102,8 +102,8 @@ export const FITUR: { judul: string; isi: string; icon: LucideIcon }[] = [
     icon: ScanLine,
   },
   {
-    judul: "Radar 6 Pertanyaan",
-    isi: "Omzet, untung, kas, stok, tagihan, agenda — masing-masing satu angka dan satu tombol aksi.",
+    judul: "Promo & Diskon Member",
+    isi: "Atur diskon sehari, sepekan, atau untuk pelanggan langganan — potongannya jalan sendiri di kasir.",
     icon: LineChart,
   },
 ];

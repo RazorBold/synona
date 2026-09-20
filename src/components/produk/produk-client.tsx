@@ -22,6 +22,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { StokDialog } from "@/components/produk/stok-dialog";
 import type { BarisBahan } from "@/server/queries/persediaan";
 import { formatRupiah, persen } from "@/lib/money";
+import { useMuatBertahap } from "@/lib/muat-bertahap";
 import { cn } from "@/lib/utils";
 import { arsipkanProduk } from "@/server/actions/produk";
 import type { BarisProduk } from "@/server/queries/produk";
@@ -78,6 +79,15 @@ export function ProdukClient({
       return true;
     });
   }, [produk, cari, kategoriId, status]);
+
+  // Daftar panjang dirender bertahap (lihat useMuatBertahap): baris tabel
+  // dan kartu sama-sama membawa satu permintaan gambar.
+  const { batas, penanda, selesai } = useMuatBertahap(
+    `${kategoriId ?? ""}|${status}|${cari.trim().toLowerCase()}`,
+    hasil.length,
+    30,
+  );
+  const tampil = hasil.slice(0, batas);
 
   function bukaTambah() {
     setTerpilih(null);
@@ -220,7 +230,7 @@ export function ProdukClient({
               </tr>
             </thead>
             <tbody>
-              {hasil.map((p) => (
+              {tampil.map((p) => (
                 <tr
                   key={p.id}
                   className="group border-b border-line/70 transition-colors hover:bg-canvas/70"
@@ -232,6 +242,7 @@ export function ProdukClient({
                         emoji={p.emoji}
                         nama={p.nama}
                         className="size-10"
+                        perluLebar={40}
                       />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-ink">
@@ -296,7 +307,7 @@ export function ProdukClient({
 
         {/* Kartu (layar kecil) */}
         <ul className="mt-4 space-y-3 lg:hidden">
-          {hasil.map((p) => (
+          {tampil.map((p) => (
             <li key={p.id} className="rounded-2xl border border-line p-3.5">
               <div className="flex items-start gap-3">
                 <GambarProduk
@@ -304,6 +315,7 @@ export function ProdukClient({
                   emoji={p.emoji}
                   nama={p.nama}
                   className="size-11"
+                  perluLebar={44}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">
@@ -353,6 +365,14 @@ export function ProdukClient({
             </li>
           ))}
         </ul>
+
+        {hasil.length > 0 && (
+          <div ref={penanda} className="pt-4 text-center text-xs text-muted">
+            {selesai
+              ? hasil.length > 30 && `${hasil.length} produk ditampilkan`
+              : `Memuat produk lain… (${tampil.length} dari ${hasil.length})`}
+          </div>
+        )}
 
         {hasil.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">

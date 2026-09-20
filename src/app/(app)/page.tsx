@@ -7,14 +7,16 @@ import {
   Users,
 } from "lucide-react";
 
-import { PaymentDonut, SalesChart } from "@/components/dashboard/charts-lazy";
+import {
+  PaymentDonut,
+  SalesChart,
+  UangMasukChart,
+} from "@/components/dashboard/charts-lazy";
 import { DebtPanel } from "@/components/dashboard/debt-panel";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AntreanCard } from "@/components/dashboard/antrean-card";
 import { LowStockCard } from "@/components/dashboard/low-stock-card";
 import { QuickActions } from "@/components/dashboard/quick-actions";
-import { PanelTanya } from "@/components/dashboard/panel-tanya";
-import { RadarPanel } from "@/components/dashboard/radar-panel";
 import { TipsBanner } from "@/components/dashboard/tips-banner";
 import {
   formatTanggalPanjang,
@@ -115,11 +117,6 @@ export default async function DashboardPage({
           />
         </div>
 
-        {/* Radar 6 pertanyaan */}
-        <RadarPanel butir={d.radar} />
-
-        {/* Pertanyaan yang dipilih sesuai keadaan outlet hari ini */}
-        <PanelTanya butir={d.tanya} />
 
         {/* Grafik + utang jatuh tempo */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
@@ -141,6 +138,17 @@ export default async function DashboardPage({
             />
           </div>
         </div>
+
+        {/* Uang masuk per sumber + totalnya */}
+        <UangMasukChart
+          hari={jumlahHari}
+          data={d.uangMasuk.map((u) => ({
+            label: formatTanggalPendek(u.tanggal),
+            penjualan: u.penjualan,
+            cicilan: u.cicilan,
+            lain: u.lain,
+          }))}
+        />
 
         {/* Stok, pembayaran, aksi cepat */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">

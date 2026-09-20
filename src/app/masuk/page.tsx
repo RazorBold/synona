@@ -4,6 +4,7 @@ import { BarChart3, ShieldCheck, Smartphone } from "lucide-react";
 
 import { BingkaiAuth } from "@/components/auth/bingkai-auth";
 import { FormMasuk } from "@/components/auth/form-masuk";
+import { Pelacak } from "@/components/trafik/pelacak";
 import gambar from "@/images/auth-masuk.webp";
 import { PENGGUNA_DEFAULT, RUTE_DAFTAR, SANDI_DEFAULT } from "@/lib/auth-const";
 import {
@@ -82,8 +83,10 @@ export default async function HalamanMasuk({
         tanya: "Belum punya akun?",
         label: "Daftar sekarang",
         href: RUTE_DAFTAR,
+        jejak: "masuk:daftar",
       }}
     >
+      <Pelacak halaman="/masuk" />
       <FormMasuk lanjut={lanjut ?? null} perluJenisUsaha={perluJenisUsaha} />
 
       {demoAktif && (

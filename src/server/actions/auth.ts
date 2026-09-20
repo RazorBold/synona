@@ -26,6 +26,7 @@ import {
   sisaMenitBlokir,
   wajibSesi,
 } from "@/server/auth";
+import { catatMasuk, catatPendaftaran } from "@/server/trafik";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -96,6 +97,7 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
   }
 
   resetLoginGagal(namaPengguna);
+  await catatMasuk();
   await buatSesi({
     penggunaId: akun.id,
     namaPengguna: akun.namaPengguna,
@@ -257,6 +259,9 @@ export async function daftar(input: unknown): Promise<HasilAksi> {
           name: d.namaPemilik,
           phone: telepon,
           plan: "mulai",
+          // Pendaftar baru wajib berlangganan: terkunci ke /langganan sampai
+          // pembayaran pertamanya disetujui pengelola.
+          wajibBayar: 1,
         })
         .run();
 
@@ -299,8 +304,9 @@ export async function daftar(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal mendaftar" };
   }
 
+  await catatPendaftaran();
   await buatSesi({ penggunaId, namaPengguna, peran: "pemilik" });
-  redirect("/");
+  redirect("/langganan");
 }
 
 export async function keluar(): Promise<never> {

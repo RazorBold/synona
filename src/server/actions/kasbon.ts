@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { customers, debtPayments, debts } from "@/db/schema";
 import { wajibSesi } from "@/server/auth";
 import { pilihAkunKas } from "@/server/kas";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 import { getRiwayatCicilan } from "@/server/queries/kasbon";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -39,7 +39,7 @@ export async function catatPembayaran(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -116,7 +116,7 @@ export async function tambahUtang(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -164,7 +164,7 @@ export async function ubahJatuhTempo(
   jatuhTempo: string | null,
 ): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   if (jatuhTempo && !/^\d{4}-\d{2}-\d{2}$/.test(jatuhTempo)) {
     return { ok: false, error: "Tanggal tidak valid" };
@@ -189,7 +189,7 @@ export async function ubahJatuhTempo(
 /** Riwayat cicilan satu utang (dipakai di dialog pembayaran). */
 export async function ambilRiwayatCicilan(debtId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   const milikOutlet = db.get<{ n: number }>(
     sql`SELECT COUNT(*) AS n FROM debts

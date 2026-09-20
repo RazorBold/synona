@@ -2,8 +2,9 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { Check, Crown } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
-import { PAKET, type Paket } from "@/lib/paket";
+import { PAKET, statusLangganan, type Paket } from "@/lib/paket";
 import { formatRupiah } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getOutletAktif } from "@/server/queries/dashboard";
@@ -104,11 +105,25 @@ export default async function HalamanPaket() {
         })}
       </div>
 
-      <p className="mt-6 rounded-2xl bg-canvas px-4 py-3 text-sm text-ink-soft">
-        Pembayaran otomatis belum aktif — paket diubah manual oleh pengelola
-        Synona Anda. Batas outlet dan kasir di atas sudah ditegakkan di server,
-        bukan cuma tampilan.
-      </p>
+      {statusLangganan(outlet) === "bebas" ? (
+        <p className="mt-6 rounded-2xl bg-canvas px-4 py-3 text-sm text-ink-soft">
+          Akun ini terdaftar sebelum ada langganan berbayar, jadi paketnya diatur
+          manual oleh pengelola Synona. Batas outlet dan kasir di atas sudah
+          ditegakkan di server, bukan cuma tampilan.
+        </p>
+      ) : (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50 px-5 py-4">
+          <p className="text-sm text-ink-soft">
+            Perpanjang atau ganti paket lewat QRIS. Sisa hari yang berjalan tidak hangus.
+          </p>
+          <Link
+            href="/langganan"
+            className="rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-600"
+          >
+            Perpanjang / ganti paket
+          </Link>
+        </div>
+      )}
     </>
   );
 }

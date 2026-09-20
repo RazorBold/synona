@@ -5,11 +5,13 @@ import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { BP_DISKON_MAKS } from "@/lib/diskon";
+
 import { db } from "@/db";
 import { customers } from "@/db/schema";
 import { normalisasiNomorHp } from "@/lib/wa";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletAktif, getOutletMenulis } from "@/server/queries/dashboard";
 import { getRiwayatPelanggan } from "@/server/queries/pelanggan";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -19,6 +21,8 @@ const PelangganInput = z.object({
   nama: z.string().trim().min(2, "Nama pelanggan minimal 2 huruf").max(80),
   phone: z.string().trim().max(24).nullable().default(null),
   catatan: z.string().trim().max(200).nullable().default(null),
+  /** Diskon langganan dalam basis poin; 500 = 5%. */
+  diskonBp: z.number().int().min(0).max(BP_DISKON_MAKS).default(0),
 });
 
 export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
@@ -39,7 +43,7 @@ export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
   }
 
   // TODO(langkah 5): ganti dengan requireOutlet() berbasis sesi.
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -74,7 +78,7 @@ export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
         if (!ada) throw new Error("Pelanggan tidak ditemukan di outlet ini");
 
         tx.update(customers)
-          .set({ name: d.nama, phone, note: d.catatan })
+          .set({ name: d.nama, phone, note: d.catatan, diskonBp: d.diskonBp })
           .where(eq(customers.id, d.id))
           .run();
         return;
@@ -87,6 +91,7 @@ export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
           name: d.nama,
           phone,
           note: d.catatan,
+          diskonBp: d.diskonBp,
         })
         .run();
     });
@@ -106,7 +111,7 @@ export async function simpanPelanggan(input: unknown): Promise<HasilAksi> {
  */
 export async function arsipkanPelanggan(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {

@@ -4,6 +4,7 @@ import { LayoutGrid, ShieldCheck, TrendingUp } from "lucide-react";
 
 import { BingkaiAuth } from "@/components/auth/bingkai-auth";
 import { FormDaftar } from "@/components/auth/form-daftar";
+import { Pelacak } from "@/components/trafik/pelacak";
 import gambar from "@/images/auth-daftar.webp";
 import { RUTE_MASUK } from "@/lib/auth-const";
 import { akunSesi, sesiSaatIni } from "@/server/auth";
@@ -59,8 +60,10 @@ export default async function HalamanDaftar() {
         tanya: "Sudah punya akun?",
         label: "Masuk",
         href: RUTE_MASUK,
+        jejak: "daftar:masuk",
       }}
     >
+      <Pelacak halaman="/register" />
       <FormDaftar />
     </BingkaiAuth>
   );

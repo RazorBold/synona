@@ -55,7 +55,7 @@ function mutasi(outletId: string): SQL {
 
   return sql`
     SELECT ${akun(sql`t.cash_account_id`, sql`t.payment_method`)} AS akunId,
-           t.total                       AS nilai,
+           t.total + CASE WHEN t.tax_mode = 'tambah' THEN t.tax_amount ELSE 0 END AS nilai,
            'penjualan'                   AS kategori,
            'Penjualan ' || t.invoice_no  AS keterangan,
            t.id                          AS refId,

@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { categories, customers, products } from "@/db/schema";
+import { promoPerProduk } from "@/server/promo";
 
 export type ProdukPos = {
   id: string;
@@ -16,10 +17,17 @@ export type ProdukPos = {
   unit: string;
   batasStok: number;
   kategoriId: string | null;
+  /** Diskon promo yang sedang berjalan untuk produk ini (basis poin). */
+  promoBp: number;
+  promoNama: string | null;
 };
 
-export async function getProdukPos(outletId: string): Promise<ProdukPos[]> {
-  return db
+export async function getProdukPos(
+  outletId: string,
+  tanggal: string,
+): Promise<ProdukPos[]> {
+  const promo = promoPerProduk(outletId, tanggal);
+  const baris = db
     .select({
       id: products.id,
       nama: products.name,
@@ -36,6 +44,12 @@ export async function getProdukPos(outletId: string): Promise<ProdukPos[]> {
     .where(and(eq(products.outletId, outletId), eq(products.isActive, 1)))
     .orderBy(asc(products.name))
     .all();
+
+  return baris.map((p) => ({
+    ...p,
+    promoBp: promo.get(p.id)?.diskonBp ?? 0,
+    promoNama: promo.get(p.id)?.nama ?? null,
+  }));
 }
 
 export async function getKategoriPos(outletId: string) {
@@ -53,6 +67,7 @@ export async function getPelangganPos(outletId: string) {
       id: customers.id,
       nama: customers.name,
       phone: customers.phone,
+      diskonBp: customers.diskonBp,
     })
     .from(customers)
     .where(and(eq(customers.outletId, outletId), eq(customers.isActive, 1)))

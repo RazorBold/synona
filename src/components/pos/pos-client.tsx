@@ -8,28 +8,33 @@ import { CartPanel } from "@/components/pos/cart-panel";
 import { PaymentDialog } from "@/components/pos/payment-dialog";
 import { ProductGrid } from "@/components/pos/product-grid";
 import { formatRupiah } from "@/lib/money";
+import type { PengaturanPajak } from "@/lib/pajak";
 import type { ProdukPos } from "@/server/queries/pos";
 import { hitungJumlahItem, hitungTotal, useCart } from "@/store/cart";
 
 type Props = {
   produk: ProdukPos[];
   kategori: { id: string; nama: string }[];
-  pelanggan: { id: string; nama: string; phone: string | null }[];
+  pelanggan: { id: string; nama: string; phone: string | null; diskonBp: number }[];
   namaToko: string;
+  /** URL gambar QRIS outlet; null kalau pemilik belum memasangnya. */
+  qris: string | null;
+  pajak: PengaturanPajak;
 };
 
-export function PosClient({ produk, kategori, pelanggan, namaToko }: Props) {
+export function PosClient({ produk, kategori, pelanggan, namaToko, qris, pajak }: Props) {
   const [bayarOpen, setBayarOpen] = useState(false);
   const [keranjangOpen, setKeranjangOpen] = useState(false);
 
   const items = useCart((s) => s.items);
+  const memberBp = useCart((s) => s.memberBp);
 
   // Keranjang tersimpan dibaca setelah mount (lihat skipHydration di store).
   useEffect(() => {
     void useCart.persist.rehydrate();
   }, []);
 
-  const total = hitungTotal(items);
+  const total = hitungTotal(items, memberBp);
   const jumlah = hitungJumlahItem(items);
 
   function bukaPembayaran() {
@@ -43,6 +48,7 @@ export function PosClient({ produk, kategori, pelanggan, namaToko }: Props) {
         <ProductGrid produk={produk} kategori={kategori} />
 
         <CartPanel
+          pajak={pajak}
           onBayar={bukaPembayaran}
           className="sticky top-[92px] hidden max-h-[calc(100dvh-116px)] xl:flex"
         />
@@ -80,6 +86,7 @@ export function PosClient({ produk, kategori, pelanggan, namaToko }: Props) {
             </Dialog.Close>
             {/* Beri ruang di kanan header panel agar tidak tertimpa tombol tutup. */}
             <CartPanel
+              pajak={pajak}
               onBayar={bukaPembayaran}
               className="max-h-[88dvh] rounded-none border-0 shadow-none [&>div:first-child]:pr-14"
             />
@@ -92,6 +99,8 @@ export function PosClient({ produk, kategori, pelanggan, namaToko }: Props) {
         onOpenChange={setBayarOpen}
         pelanggan={pelanggan}
         namaToko={namaToko}
+        qris={qris}
+        pajak={pajak}
       />
     </>
   );

@@ -15,10 +15,13 @@ import {
   transactions,
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
+import { diskonBarisFinal } from "@/lib/diskon";
+import { hitungPajak, labelPajak, pajakAktif } from "@/lib/pajak";
 import { normalisasiNomorHp } from "@/lib/wa";
 import { wajibSesi } from "@/server/auth";
 import { pilihAkunKas } from "@/server/kas";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
+import { promoPerProduk } from "@/server/promo";
 
 const ItemInput = z.object({
   productId: z.string().min(1),
@@ -54,8 +57,12 @@ export type HasilTransaksi =
       ok: true;
       id: string;
       invoiceNo: string;
+      /** Yang dibayar pembeli (sudah termasuk pajak "tambah"). */
       total: number;
       kembalian: number;
+      pajak: number;
+      labelPajak: string | null;
+      modePajak: "termasuk" | "tambah" | null;
       pelanggan: { nama: string; phone: string | null } | null;
       item: { nama: string; qty: number; total: number }[];
     }
@@ -79,9 +86,12 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
   const data = parsed.data;
 
   // TODO(langkah 5): ganti dengan requireOutlet() berbasis sesi + tabel staff.
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const tanggal = businessDate(new Date(), outlet.timezone);
   const waktu = Date.now();
+  // Promo dibaca dari database, bukan dari klien: kalau tidak, harga bisa
+  // "didiskon" dari browser persis seperti harga bisa dipalsukan.
+  const promo = promoPerProduk(outlet.id, tanggal);
 
   try {
     return db.transaction((tx): HasilTransaksi => {
@@ -93,6 +103,19 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
         .all();
 
       const byId = new Map(rows.map((r) => [r.id, r]));
+
+      /**
+       * Pelanggan diselesaikan SEBELUM baris dihitung: diskon membernya ikut
+       * menentukan potongan tiap baris.
+       */
+      const customerId = pastikanPelanggan(tx, outlet.id, data);
+      const memberBp = customerId
+        ? tx
+            .select({ bp: customers.diskonBp })
+            .from(customers)
+            .where(eq(customers.id, customerId))
+            .get()?.bp ?? 0
+        : 0;
 
       let subtotal = 0;
       const barisItem: (typeof transactionItems.$inferInsert)[] = [];
@@ -107,10 +130,20 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
           throw new Error(`Stok ${p.name} tinggal ${p.stock} ${p.unit}`);
         }
 
-        // Diskon dijepit di server: tidak minus, tidak melebihi nilai baris.
-        // Nilai dari klien tidak pernah dipercaya apa adanya (lihat aturan 1).
+        /**
+         * Diskon baris = yang TERBESAR di antara potongan manual kasir,
+         * promo yang sedang berjalan, dan diskon member — tidak pernah
+         * ditumpuk (lihat src/lib/diskon.ts). Semuanya dihitung di server;
+         * nilai dari klien hanya dipakai untuk potongan manual, dan itu pun
+         * dijepit agar tidak minus atau melebihi nilai barisnya.
+         */
         const kotor = p.price * item.qty;
-        const diskon = Math.min(Math.max(0, item.diskon), kotor);
+        const { nilai: diskon } = diskonBarisFinal(
+          kotor,
+          item.diskon,
+          promo.get(p.id)?.diskonBp ?? 0,
+          memberBp,
+        );
         const lineTotal = kotor - diskon;
         subtotal += lineTotal;
 
@@ -134,18 +167,30 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
       const discount = 0;
       const total = subtotal;
 
-      const customerId = pastikanPelanggan(tx, outlet.id, data);
-
       if (data.paymentMethod === "debt" && !customerId) {
         throw new Error("Isi nama pelanggan dulu untuk transaksi utang");
       }
-      if (data.paymentMethod === "cash" && data.paidAmount < total) {
+      /**
+       * Pajak dihitung ULANG di server dari pengaturan outlet — nilai dari
+       * klien tidak dipercaya, sama seperti harga. Labelnya ikut disimpan
+       * sebagai snapshot supaya nota lama tetap benar kalau tarifnya diubah.
+       */
+      const pajakOutlet = {
+        nama: outlet.pajakNama,
+        bp: outlet.pajakBp,
+        mode: outlet.pajakMode,
+      };
+      const pajak = hitungPajak(total, pajakOutlet);
+      // Hanya pajak "tambah" yang menambah tagihan pembeli.
+      const tagihan = pajakOutlet.mode === "tambah" ? total + pajak : total;
+
+      if (data.paymentMethod === "cash" && data.paidAmount < tagihan) {
         throw new Error("Uang diterima kurang dari total belanja");
       }
 
       const isUtang = data.paymentMethod === "debt";
-      const dibayar = isUtang ? 0 : Math.max(data.paidAmount, total);
-      const kembalian = isUtang ? 0 : Math.max(0, dibayar - total);
+      const dibayar = isUtang ? 0 : Math.max(data.paidAmount, tagihan);
+      const kembalian = isUtang ? 0 : Math.max(0, dibayar - tagihan);
 
       // Ambil nomor terbesar hari ini, bukan COUNT(*): transaksi yang di-void
       // atau terhapus tidak boleh membuat nomor terpakai ulang — kolom
@@ -182,6 +227,9 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
               ),
           paidAmount: dibayar,
           changeAmount: kembalian,
+          taxAmount: pajak,
+          taxLabel: pajakAktif(pajakOutlet) ? labelPajak(pajakOutlet) : null,
+          taxMode: pajakAktif(pajakOutlet) ? pajakOutlet.mode : null,
           status: isUtang ? "debt" : "paid",
           occurredAt: waktu,
           businessDate: tanggal,
@@ -227,9 +275,9 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
             outletId: outlet.id,
             customerId: customerId!,
             transactionId: txId,
-            amount: total,
+            amount: tagihan,
             paid: 0,
-            remaining: total,
+            remaining: tagihan,
             dueDate: data.dueDate,
             status: "open",
           })
@@ -248,8 +296,11 @@ export async function simpanTransaksi(input: unknown): Promise<HasilTransaksi> {
         ok: true,
         id: txId,
         invoiceNo,
-        total,
+        total: tagihan,
         kembalian,
+        pajak,
+        labelPajak: pajakAktif(pajakOutlet) ? labelPajak(pajakOutlet) : null,
+        modePajak: pajakAktif(pajakOutlet) ? pajakOutlet.mode : null,
         pelanggan,
         item: ringkasItem,
       };

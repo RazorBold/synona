@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { products, recipeItems } from "@/db/schema";
 import { hitungHppProduk } from "@/server/hpp";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 import { getResepProduk } from "@/server/queries/resep";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -46,7 +46,7 @@ export async function simpanResep(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   if (d.mode === "resep" && d.item.length === 0) {
     return {
@@ -116,7 +116,7 @@ export async function simpanResep(input: unknown): Promise<HasilAksi> {
 
 export async function ambilResep(productId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const milik = db
     .select({ id: products.id })
     .from(products)

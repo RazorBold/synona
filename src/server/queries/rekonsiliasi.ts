@@ -42,13 +42,16 @@ export async function getRingkasanKas(
     lain: number;
   }>(sql`
     SELECT
-      COALESCE((SELECT SUM(total) FROM transactions
+      COALESCE((SELECT SUM(total + CASE WHEN tax_mode = 'tambah' THEN tax_amount ELSE 0 END)
+                  FROM transactions
                  WHERE outlet_id = ${outletId} AND status = 'paid'
                    AND payment_method = 'cash' AND business_date = ${tanggal}), 0) AS tunai,
-      COALESCE((SELECT SUM(total) FROM transactions
+      COALESCE((SELECT SUM(total + CASE WHEN tax_mode = 'tambah' THEN tax_amount ELSE 0 END)
+                  FROM transactions
                  WHERE outlet_id = ${outletId} AND status = 'paid'
                    AND payment_method = 'qris' AND business_date = ${tanggal}), 0) AS qris,
-      COALESCE((SELECT SUM(total) FROM transactions
+      COALESCE((SELECT SUM(total + CASE WHEN tax_mode = 'tambah' THEN tax_amount ELSE 0 END)
+                  FROM transactions
                  WHERE outlet_id = ${outletId} AND status = 'paid'
                    AND payment_method = 'transfer' AND business_date = ${tanggal}), 0) AS transfer,
       COALESCE((SELECT COUNT(*) FROM transactions

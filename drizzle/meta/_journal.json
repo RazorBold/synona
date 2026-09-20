@@ -78,6 +78,34 @@
       "when": 1789312302374,
       "tag": "0010_tan_sage",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1789806281050,
+      "tag": "0011_jejak_pengunjung",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789835481855,
+      "tag": "0012_langganan_berbayar",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1789881485599,
+      "tag": "0013_qris_dan_pajak",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1789893562387,
+      "tag": "0014_promo_dan_diskon_member",
+      "breakpoints": true
     }
   ]
 }

@@ -5,10 +5,30 @@ export const MAKS_SISI = 720; // px
 /** Nama berkas yang sah: hasil nanoid + ekstensi yang kita tulis sendiri. */
 export const POLA_NAMA_GAMBAR = /^[A-Za-z0-9_-]{1,32}\.(webp|jpe?g|png)$/;
 
-/** Nama berkas di database diubah menjadi URL yang bisa dibuka browser. */
-export function urlGambar(nama: string | null | undefined): string | null {
+/**
+ * Lebar thumbnail yang boleh diminta ke /api/gambar. Daftarnya dibatasi
+ * supaya orang tidak bisa menyuruh server membuat ribuan ukuran berbeda —
+ * tiap ukuran baru berarti satu kerja resize dan satu berkas cache.
+ */
+export const LEBAR_THUMBNAIL = [96, 192, 384, 768] as const;
+export type LebarThumbnail = (typeof LEBAR_THUMBNAIL)[number];
+
+/**
+ * Nama berkas di database diubah menjadi URL yang bisa dibuka browser.
+ * `lebar` meminta versi kecil: kartu POS hanya butuh ±200px, jadi mengirim
+ * foto asli 720px ke sana memboroskan kuota pemilik warung berkali lipat.
+ */
+export function urlGambar(
+  nama: string | null | undefined,
+  lebar?: LebarThumbnail,
+): string | null {
   if (!nama) return null;
-  return `/api/gambar/${nama}`;
+  return lebar ? `/api/gambar/${nama}?l=${lebar}` : `/api/gambar/${nama}`;
+}
+
+/** Ukuran thumbnail terkecil yang masih >= lebar tampilan. */
+export function lebarThumbnail(perlu: number): LebarThumbnail {
+  return LEBAR_THUMBNAIL.find((l) => l >= perlu) ?? LEBAR_THUMBNAIL[LEBAR_THUMBNAIL.length - 1];
 }
 
 /**

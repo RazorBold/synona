@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { expenses } from "@/db/schema";
 import { wajibSesi } from "@/server/auth";
 import { pilihAkunKas } from "@/server/kas";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -42,7 +42,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     if (d.id) {
@@ -104,7 +104,7 @@ export async function simpanBeban(input: unknown): Promise<HasilAksi> {
  */
 export async function hapusBeban(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.delete(expenses)
