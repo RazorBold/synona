@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, asc, eq, lte, ne, sql } from "drizzle-orm";
 
+import { cookies } from "next/headers";
+
 import { db } from "@/db";
 import {
   customers,
@@ -12,6 +14,7 @@ import {
   staff,
   users,
 } from "@/db/schema";
+import { NAMA_COOKIE_OUTLET } from "@/lib/auth-const";
 import { businessDate, rentangHari, tambahHari } from "@/lib/date";
 import { statusLangganan } from "@/lib/paket";
 import { wajibSesi } from "@/server/auth";
@@ -54,7 +57,7 @@ export async function getOutletAktif() {
   const sesi = await wajibSesi();
 
   const akun = db
-    .select({ userId: pengguna.userId })
+    .select({ userId: pengguna.userId, peran: pengguna.peran })
     .from(pengguna)
     .where(eq(pengguna.id, sesi.penggunaId))
     .get();
@@ -66,18 +69,41 @@ export async function getOutletAktif() {
    * bisa jadi milik usaha orang lain.
    */
   if (akun?.userId) {
+    const keanggotaan = and(
+      eq(staff.userId, akun.userId),
+      eq(staff.isActive, 1),
+      eq(outlets.isActive, 1),
+    );
+
+    /**
+     * Pemilik dengan beberapa outlet memilih outlet lewat cookie. Nilai
+     * cookie tidak pernah dipercaya apa adanya: id itu hanya dipakai kalau
+     * pengguna memang anggota aktif outlet tersebut (syarat `keanggotaan`
+     * ikut di WHERE). Kasir tidak berpindah — cookie-nya diabaikan.
+     */
+    if (akun.peran === "pemilik") {
+      const dipilih = (await cookies()).get(NAMA_COOKIE_OUTLET)?.value;
+      if (dipilih) {
+        const cocok = db
+          .select(KOLOM_OUTLET)
+          .from(staff)
+          .innerJoin(outlets, eq(outlets.id, staff.outletId))
+          .innerJoin(users, eq(users.id, outlets.ownerId))
+          .where(and(keanggotaan, eq(outlets.id, dipilih)))
+          .get();
+        if (cocok) return cocok;
+      }
+    }
+
+    // Urutan dibuat tetap (outlet tertua dulu) supaya outlet bawaan tidak
+    // berganti-ganti mengikuti urutan baris di SQLite.
     const milikSesi = db
       .select(KOLOM_OUTLET)
       .from(staff)
       .innerJoin(outlets, eq(outlets.id, staff.outletId))
       .innerJoin(users, eq(users.id, outlets.ownerId))
-      .where(
-        and(
-          eq(staff.userId, akun.userId),
-          eq(staff.isActive, 1),
-          eq(outlets.isActive, 1),
-        ),
-      )
+      .where(keanggotaan)
+      .orderBy(asc(outlets.createdAt))
       .limit(1)
       .get();
 
@@ -124,6 +150,30 @@ export async function getOutletMenulis() {
     );
   }
   return outlet;
+}
+
+/**
+ * Outlet yang boleh dibuka akun sesi — untuk tombol pemindah outlet.
+ * Kasir selalu mendapat daftar kosong: ia terkunci di outletnya.
+ */
+export async function getOutletSaya(): Promise<{ id: string; nama: string }[]> {
+  const sesi = await wajibSesi();
+  const akun = db
+    .select({ userId: pengguna.userId, peran: pengguna.peran })
+    .from(pengguna)
+    .where(eq(pengguna.id, sesi.penggunaId))
+    .get();
+  if (!akun?.userId || akun.peran !== "pemilik") return [];
+
+  return db
+    .select({ id: outlets.id, nama: outlets.name })
+    .from(staff)
+    .innerJoin(outlets, eq(outlets.id, staff.outletId))
+    .where(
+      and(eq(staff.userId, akun.userId), eq(staff.isActive, 1), eq(outlets.isActive, 1)),
+    )
+    .orderBy(asc(outlets.createdAt))
+    .all();
 }
 
 export type RingkasanHarian = {

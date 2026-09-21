@@ -2,6 +2,7 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -14,14 +15,20 @@ import { JENIS_GAMBAR, MAKS_UKURAN_BYTE } from "@/lib/gambar";
 import { BP_MAKS } from "@/lib/pajak";
 import { PAKET, type Paket } from "@/lib/paket";
 import { normalisasiNomorHp } from "@/lib/wa";
+import { NAMA_COOKIE_OUTLET } from "@/lib/auth-const";
 import {
   buatSalt,
   hashSandi,
+  pakaiHttps,
   periksaKekuatanSandi,
   wajibSesi,
 } from "@/server/auth";
 import { buatAkunKasBawaan } from "@/server/kas";
-import { getOutletAktif, getOutletMenulis } from "@/server/queries/dashboard";
+import {
+  getOutletAktif,
+  getOutletMenulis,
+  getOutletSaya,
+} from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -587,5 +594,32 @@ export async function simpanPembayaranOutlet(formData: FormData): Promise<HasilA
 
   revalidatePath("/outlet");
   revalidatePath("/kasir");
+  return { ok: true };
+}
+
+/* ------------------------------------------------ pindah outlet */
+
+/**
+ * Memindah outlet yang sedang dibuka pemilik. Keanggotaan diperiksa di sini
+ * DAN di `getOutletAktif()` setiap permintaan — cookie hanyalah pilihan,
+ * bukan izin.
+ */
+export async function pilihOutlet(outletId: string): Promise<HasilAksi> {
+  const daftar = await getOutletSaya();
+  if (!daftar.some((o) => o.id === outletId)) {
+    return { ok: false, error: "Outlet itu tidak bisa dibuka dengan akun ini." };
+  }
+
+  (await cookies()).set(NAMA_COOKIE_OUTLET, outletId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: await pakaiHttps(),
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+
+  // Seluruh halaman aplikasi membaca outlet aktif, jadi semuanya dibuang
+  // dari cache — bukan cuma halaman yang sedang dibuka.
+  revalidatePath("/", "layout");
   return { ok: true };
 }

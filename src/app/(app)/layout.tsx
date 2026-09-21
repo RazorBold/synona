@@ -10,7 +10,7 @@ import { SetupJenisUsaha } from "@/components/onboarding/setup-jenis-usaha";
 import { RUTE_GANTI_SANDI, RUTE_SESI_BERAKHIR } from "@/lib/auth-const";
 import { statusLangganan } from "@/lib/paket";
 import { akunSesi, sesiSaatIni } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletAktif, getOutletSaya } from "@/server/queries/dashboard";
 import { daftarPertanyaan } from "@/server/queries/asisten";
 import { getStatistikPengingat } from "@/server/queries/pengingat";
 import { adminPlatform } from "@/server/langganan";
@@ -55,7 +55,10 @@ export default async function AppLayout({
     return <SetupJenisUsaha namaOutlet={outlet.name} namaPemilik={akun.nama} />;
   }
 
-  const pengingat = await getStatistikPengingat(outlet.id);
+  const [pengingat, daftarOutlet] = await Promise.all([
+    getStatistikPengingat(outlet.id),
+    getOutletSaya(),
+  ]);
 
   /**
    * Nomor bantuan dari env, bukan ditanam di kode. Kalau belum diisi, kartu
@@ -79,6 +82,8 @@ export default async function AppLayout({
       namaPemilik={akun.nama}
       peran={akun.peran === "pemilik" ? "Pemilik" : "Kasir"}
       namaOutlet={outlet.name}
+      outletId={outlet.id}
+      daftarOutlet={daftarOutlet}
       jenisUsaha={outlet.jenisUsaha}
       paket={paket}
       berlakuSampai={berlakuSampai}

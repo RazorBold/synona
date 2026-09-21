@@ -1,0 +1,70 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8b7cf8" />
+      <stop offset="50%" stop-color="#6d5df6" />
+      <stop offset="100%" stop-color="#4a3cc0" />
+    </linearGradient>
+    <linearGradient id="roofGrad" x1="120" y1="140" x2="392" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f0edff" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#ea5d5b" />
+    </linearGradient>
+    <filter id="dropShadow" x="0" y="20" width="512" height="492" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="24" result="blur" />
+      <feOffset dy="16" />
+      <feComponentTransfer><feFuncA type="linear" slope="0.35" /></feComponentTransfer>
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="softGlow" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="12" result="glow" />
+      <feMerge>
+        <feMergeNode in="glow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect x="48" y="48" width="416" height="416" rx="100" fill="url(#bgGrad)" filter="url(#dropShadow)" />
+
+  <!-- Subtle Glass Highlight at Top -->
+  <path d="M48 148C48 92.7715 92.7715 48 148 48H364C419.229 48 464 92.7715 464 148V190C360 210 200 170 48 230V148Z" fill="white" fill-opacity="0.12" />
+
+  <!-- Inner Store & POS Silhouette -->
+  <!-- Store Roof Canopy -->
+  <path d="M128 200 C128 170, 160 152, 200 152 H312 C352 152, 384 170, 384 200 L396 232 C400 244, 390 256, 376 256 H136 C122 256, 112 244, 116 232 Z" fill="url(#roofGrad)" />
+  
+  <!-- Canopy Stripes -->
+  <path d="M168 154 L162 256" stroke="#6d5df6" stroke-width="8" stroke-linecap="round" opacity="0.35" />
+  <path d="M224 152 L224 256" stroke="#6d5df6" stroke-width="8" stroke-linecap="round" opacity="0.35" />
+  <path d="M288 152 L288 256" stroke="#6d5df6" stroke-width="8" stroke-linecap="round" opacity="0.35" />
+  <path d="M344 154 L350 256" stroke="#6d5df6" stroke-width="8" stroke-linecap="round" opacity="0.35" />
+
+  <!-- Cash Register Base / Building Body -->
+  <rect x="144" y="272" width="224" height="116" rx="20" fill="#ffffff" fill-opacity="0.95" />
+
+  <!-- Screen / Display -->
+  <rect x="168" y="292" width="176" height="44" rx="10" fill="#1e2235" />
+  <!-- Screen Numbers / Graph -->
+  <rect x="180" y="306" width="48" height="16" rx="4" fill="#22c55e" />
+  <path d="M260 318 L280 306 L300 312 L324 300" stroke="#71a7fd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Keyboard / Buttons -->
+  <circle cx="180" cy="358" r="8" fill="#6d5df6" opacity="0.7" />
+  <circle cx="204" cy="358" r="8" fill="#6d5df6" opacity="0.7" />
+  <circle cx="228" cy="358" r="8" fill="#6d5df6" opacity="0.7" />
+  <rect x="256" y="350" width="88" height="16" rx="8" fill="url(#accentGrad)" />
+
+  <!-- Rising Profit Arrow Badge -->
+  <g filter="url(#softGlow)">
+    <circle cx="368" cy="156" r="44" fill="url(#accentGrad)" />
+    <path d="M352 168 L368 144 L384 152 L394 136 M394 136 H378 M394 136 V152" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>
