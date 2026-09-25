@@ -4,9 +4,17 @@ import { Minus, Plus, ShoppingBag, Tag, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { GambarProduk } from "@/components/ui/gambar-produk";
+import { persenDiskon } from "@/lib/diskon";
 import { formatRupiah } from "@/lib/money";
+import {
+  hitungPajak,
+  labelPajak,
+  totalDibayar,
+  type PengaturanPajak,
+} from "@/lib/pajak";
 import { cn } from "@/lib/utils";
 import {
+  asalDiskonBaris,
   batasQty,
   bersihBaris,
   diskonBaris,
@@ -22,15 +30,19 @@ import {
 export function CartPanel({
   onBayar,
   className,
+  pajak,
 }: {
   onBayar: () => void;
   className?: string;
+  pajak: PengaturanPajak;
 }) {
-  const { items, setQty, hapus, kosongkan } = useCart();
+  const { items, setQty, hapus, kosongkan, memberBp, memberNama } = useCart();
 
   const subtotal = hitungSubtotal(items);
-  const potongan = hitungDiskon(items);
-  const total = hitungTotal(items);
+  const potongan = hitungDiskon(items, memberBp);
+  const total = hitungTotal(items, memberBp);
+  const nilaiPajak = hitungPajak(total, pajak);
+  const tagihan = totalDibayar(total, nilaiPajak, pajak.mode);
   const jumlahItem = hitungJumlahItem(items);
 
   return (
@@ -120,18 +132,29 @@ export function CartPanel({
                 </div>
 
                 <div className="text-right">
-                  {diskonBaris(i) > 0 && (
+                  {diskonBaris(i, memberBp) > 0 && (
                     <p className="tabular text-[11px] text-muted line-through">
                       {formatRupiah(kotorBaris(i))}
                     </p>
                   )}
                   <p className="tabular text-sm font-bold text-ink">
-                    {formatRupiah(bersihBaris(i))}
+                    {formatRupiah(bersihBaris(i, memberBp))}
                   </p>
+                  {/* Dari mana potongannya — supaya kasir tidak menduga-duga. */}
+                  {asalDiskonBaris(i, memberBp) === "promo" && (
+                    <p className="text-[11px] font-semibold text-rose-500">
+                      {i.promoNama ?? "Promo"}
+                    </p>
+                  )}
+                  {asalDiskonBaris(i, memberBp) === "member" && (
+                    <p className="text-[11px] font-semibold text-brand-500">
+                      Member {persenDiskon(memberBp)}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <DiskonBaris item={i} />
+              <DiskonBaris item={i} memberBp={memberBp} />
             </li>
           ))}
         </ul>
@@ -148,9 +171,25 @@ export function CartPanel({
 
           {potongan > 0 && (
             <div className="flex items-center justify-between">
-              <dt className="text-muted">Diskon</dt>
+              <dt className="text-muted">
+                Diskon
+                {memberNama && memberBp > 0 && (
+                  <span className="ml-1 text-xs">
+                    (termasuk member {persenDiskon(memberBp)})
+                  </span>
+                )}
+              </dt>
               <dd className="tabular font-semibold text-emerald-600">
                 − {formatRupiah(potongan)}
+              </dd>
+            </div>
+          )}
+
+          {nilaiPajak > 0 && pajak.mode === "tambah" && (
+            <div className="flex items-center justify-between">
+              <dt className="text-muted">{labelPajak(pajak)}</dt>
+              <dd className="tabular font-semibold text-ink">
+                + {formatRupiah(nilaiPajak)}
               </dd>
             </div>
           )}
@@ -158,9 +197,15 @@ export function CartPanel({
           <div className="flex items-baseline justify-between border-t border-line pt-3">
             <dt className="font-semibold text-ink">Total</dt>
             <dd className="tabular text-2xl font-extrabold tracking-tight text-ink">
-              {formatRupiah(total)}
+              {formatRupiah(tagihan)}
             </dd>
           </div>
+
+          {nilaiPajak > 0 && pajak.mode === "termasuk" && (
+            <p className="text-right text-xs text-muted">
+              Termasuk {labelPajak(pajak)} {formatRupiah(nilaiPajak)}
+            </p>
+          )}
         </dl>
 
         <button
@@ -168,7 +213,7 @@ export function CartPanel({
           disabled={items.length === 0}
           className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 to-brand-400 text-sm font-bold text-white shadow-pop transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:from-line disabled:to-line disabled:text-muted disabled:shadow-none"
         >
-          Bayar {items.length > 0 && `· ${formatRupiah(total)}`}
+          Bayar {items.length > 0 && `· ${formatRupiah(tagihan)}`}
         </button>
       </div>
     </section>
@@ -179,9 +224,10 @@ export function CartPanel({
  * Diskon untuk satu baris. Tersembunyi di balik tautan kecil supaya
  * keranjang tidak penuh kolom kosong — sebagian besar penjualan tanpa diskon.
  */
-function DiskonBaris({ item }: { item: ItemKeranjang }) {
+function DiskonBaris({ item, memberBp }: { item: ItemKeranjang; memberBp: number }) {
   const setDiskonItem = useCart((s) => s.setDiskonItem);
-  const aktif = diskonBaris(item) > 0;
+  const aktif = (item.diskon ?? 0) > 0;
+  void memberBp;
   const [buka, setBuka] = useState(aktif);
 
   if (!buka && !aktif) {

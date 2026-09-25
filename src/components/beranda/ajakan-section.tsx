@@ -8,7 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { RUTE_MASUK } from "@/lib/auth-const";
+import { RUTE_DAFTAR } from "@/lib/auth-const";
 
 const JANJI: { ikon: LucideIcon; baris: [string, string] }[] = [
   { ikon: MonitorSmartphone, baris: ["Jalan di HP, tablet,", "dan komputer"] },
@@ -19,7 +19,10 @@ const JANJI: { ikon: LucideIcon; baris: [string, string] }[] = [
 /** Penutup halaman depan — mengikuti mockup src/images/b.png. */
 export function AjakanSection() {
   return (
-    <section className="bg-[linear-gradient(180deg,#ffffff_0%,#f8faff_100%)] px-5 py-16 sm:px-8 lg:py-20">
+    <section
+      data-jejak-bagian="ajakan"
+      className="bg-[linear-gradient(180deg,#ffffff_0%,#f8faff_100%)] px-5 py-16 sm:px-8 lg:py-20"
+    >
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[32px] border border-[#e3ebf8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-12 text-center shadow-[0_30px_70px_-40px_rgba(30,58,138,0.35)] sm:px-10 lg:py-14">
         {/* Hiasan: kisi titik di kanan atas, lingkaran pucat di kiri bawah. */}
         <div
@@ -74,15 +77,16 @@ export function AjakanSection() {
           </ul>
 
           <Link
-            href={RUTE_MASUK}
+            href={RUTE_DAFTAR}
+            data-jejak="ajakan:daftar"
             className="group mt-9 inline-flex h-14 items-center gap-2.5 rounded-full bg-blue-600 px-12 text-[16px] font-bold text-white shadow-[0_16px_32px_-14px_rgba(37,99,235,0.75)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-blue-700"
           >
-            Masuk ke Synona
+            Coba Gratis 14 Hari
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
 
           <p className="mt-4 text-sm text-ink-soft">
-            Mulai lebih rapi, lebih tenang, setiap hari.
+            Tanpa kartu kredit. Semua fitur terbuka sejak hari pertama.
           </p>
         </div>
       </div>

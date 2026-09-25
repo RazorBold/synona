@@ -1,17 +1,27 @@
 "use client";
 
-import { Bell, Menu, Search, Store } from "lucide-react";
+import { Bell, Menu, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { PilihOutlet } from "./pilih-outlet";
+
 type Props = {
   namaOutlet: string;
+  outletId: string;
+  daftarOutlet: { id: string; nama: string }[];
   jumlahNotifikasi: number;
   onMenu: () => void;
 };
 
-export function Topbar({ namaOutlet, jumlahNotifikasi, onMenu }: Props) {
+export function Topbar({
+  namaOutlet,
+  outletId,
+  daftarOutlet,
+  jumlahNotifikasi,
+  onMenu,
+}: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const params = useSearchParams();
@@ -64,16 +74,7 @@ export function Topbar({ namaOutlet, jumlahNotifikasi, onMenu }: Props) {
       </form>
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
-        {/*
-          Label, bukan tombol. Aplikasi ini baru melayani satu outlet aktif
-          (lihat getOutletAktif), jadi memasang panah dropdown di sini akan
-          menjanjikan pilihan yang tidak ada — persis keluhan yang membuat
-          orang mengira aplikasinya rusak.
-        */}
-        <div className="hidden h-12 items-center gap-2.5 rounded-2xl border border-line bg-white px-4 text-sm font-semibold text-ink shadow-card sm:flex">
-          <Store className="size-[18px] text-ink-soft" />
-          <span className="max-w-[140px] truncate">{namaOutlet}</span>
-        </div>
+        <PilihOutlet namaOutlet={namaOutlet} outletId={outletId} daftar={daftarOutlet} />
 
         <Link
           href="/pengingat"

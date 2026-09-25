@@ -66,7 +66,7 @@ export type SesiAktif = IsiToken;
  * saat ini masih HTTP di LAN; menghardcode `secure: true` akan membuat browser
  * membuang cookie-nya dan login gagal total tanpa pesan error.
  */
-async function pakaiHttps(): Promise<boolean> {
+export async function pakaiHttps(): Promise<boolean> {
   const h = await headers();
   return (h.get("x-forwarded-proto") ?? "").split(",")[0].trim() === "https";
 }

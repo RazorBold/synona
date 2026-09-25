@@ -128,6 +128,7 @@ function Ajakan() {
     <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
       <Link
         href={RUTE_MASUK}
+        data-jejak="hero:mulai"
         className="group inline-flex h-14 items-center gap-2 rounded-full bg-blue-600 px-8 text-[15px] font-bold text-white shadow-[0_14px_30px_-12px_rgba(37,99,235,0.7)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-blue-700"
       >
         Mulai Pakai Synona
@@ -135,6 +136,7 @@ function Ajakan() {
       </Link>
       <a
         href="#cara-kerja"
+        data-jejak="hero:cara-kerja"
         className="group inline-flex items-center gap-3 text-[15px] font-semibold text-ink-soft transition-colors hover:text-ink"
       >
         <span className="grid size-11 place-items-center rounded-full bg-white text-blue-600 shadow-[0_8px_20px_-10px_rgba(30,58,138,0.45)] ring-1 ring-blue-100 transition-transform group-hover:scale-105">
@@ -177,6 +179,7 @@ function KartuFitur({ k }: { k: (typeof KARTU)[number] }) {
         <p className="mt-2.5 text-sm leading-relaxed text-ink-soft">{k.isi}</p>
         <Link
           href={`${RUTE_MASUK}?lanjut=${encodeURIComponent(k.tujuan)}`}
+          data-jejak={`kartu:${k.tema}`}
           className={cn(
             "mt-5 inline-flex w-fit items-center gap-2 whitespace-nowrap rounded-full border bg-white/70 px-5 py-2.5 text-sm font-bold backdrop-blur transition-colors",
             t.tombol,

@@ -10,7 +10,7 @@ import { services } from "@/db/schema";
 import { rapikanSatuan } from "@/lib/satuan";
 import { estimasiKeJam } from "@/lib/usaha";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -40,7 +40,7 @@ export async function simpanLayanan(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   if (d.modal > d.harga && !d.hargaBisaDiubah) {
     return {
@@ -101,7 +101,7 @@ export async function simpanLayanan(input: unknown): Promise<HasilAksi> {
  */
 export async function arsipkanLayanan(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     const dipakai = db.get<{ n: number }>(sql`

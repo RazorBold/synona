@@ -19,7 +19,7 @@ import { businessDate } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
 import { perbaruiHppTerkaitBahan } from "@/server/hpp";
 import { pilihAkunKas } from "@/server/kas";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -73,7 +73,7 @@ export async function simpanPembelian(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const waktu = Date.now();
   const tanggal = d.tanggal ?? businessDate(new Date(), outlet.timezone);
 
@@ -271,7 +271,7 @@ export async function bayarHutangSupplier(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {

@@ -7,6 +7,13 @@
 
 export const NAMA_COOKIE_SESI = "synona_sesi";
 
+/**
+ * Outlet yang sedang dibuka pemilik yang punya lebih dari satu outlet.
+ * Hanya pilihan tampilan — server SELALU memeriksa ulang bahwa pengguna
+ * memang terdaftar di outlet itu sebelum memakainya.
+ */
+export const NAMA_COOKIE_OUTLET = "synona_outlet";
+
 /** Umur sesi: 30 hari. */
 export const UMUR_SESI_MS = 30 * 24 * 60 * 60 * 1000;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Tag,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -68,11 +69,12 @@ function susunNav(jenis: JenisUsaha): Grup[] {
     dataUsaha.push({ href: "/produk", label: "Produk & Stok", icon: Package });
   }
   dataUsaha.push(
+    { href: "/promo", label: "Promo & Diskon", icon: Tag },
     { href: "/pelanggan", label: "Pelanggan", icon: Users },
     { href: "/kasbon", label: "Utang (Kasbon)", icon: WalletCards },
   );
 
-  return [
+  const grup: Grup[] = [
     { judul: "Pencatatan", item: pencatatan },
     { judul: "Data Usaha", item: dataUsaha },
     {
@@ -91,6 +93,8 @@ function susunNav(jenis: JenisUsaha): Grup[] {
       ],
     },
   ];
+
+  return grup;
 }
 
 type Props = {

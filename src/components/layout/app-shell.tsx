@@ -11,6 +11,8 @@ type Props = {
   namaPemilik: string;
   peran: string;
   namaOutlet: string;
+  outletId: string;
+  daftarOutlet: { id: string; nama: string }[];
   jenisUsaha: JenisUsaha;
   paket: string;
   berlakuSampai: string;
@@ -23,6 +25,8 @@ export function AppShell({
   namaPemilik,
   peran,
   namaOutlet,
+  outletId,
+  daftarOutlet,
   jenisUsaha,
   paket,
   berlakuSampai,
@@ -55,6 +59,8 @@ export function AppShell({
       <div className="lg:pl-[264px]">
         <Topbar
           namaOutlet={namaOutlet}
+          outletId={outletId}
+          daftarOutlet={daftarOutlet}
           jumlahNotifikasi={jumlahNotifikasi}
           onMenu={() => setOpen(true)}
         />

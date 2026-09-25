@@ -45,6 +45,16 @@ export const users = sqliteTable("users", {
     .default("mulai"),
   trialEndsAt: integer("trial_ends_at"),
   planEndsAt: integer("plan_ends_at"),
+  /**
+   * 1 = usaha ini harus berlangganan berbayar: terkunci ke /langganan sampai
+   * pembayaran pertamanya disetujui, dan hanya-baca setelah `plan_ends_at`
+   * lewat. Diisi 1 untuk setiap pendaftaran baru lewat /register.
+   *
+   * 0 = pemasangan/akun lama dari sebelum ada pembayaran (dan akun
+   * pengelola platform) — tidak pernah dikunci, supaya pembaruan ini tidak
+   * tiba-tiba menghentikan kasir yang sudah jalan.
+   */
+  wajibBayar: integer("wajib_bayar").notNull().default(0),
   ...timestamps,
 });
 
@@ -70,6 +80,24 @@ export const outlets = sqliteTable(
      * untuk pemasangan baru.
      */
     jenisUsaha: text("jenis_usaha", { enum: ["dagang", "jasa", "campuran"] }),
+    /** Gambar QRIS milik usaha ini, ditunjukkan ke pembeli di layar bayar. */
+    qrisGambar: text("qris_gambar"),
+    /**
+     * Pajak penjualan. NULL = tidak dipakai (bawaan).
+     *
+     * `pajak_bp` dalam basis poin supaya tarif pecahan seperti PPh final
+     * 0,5% tetap bilangan bulat: 50 bp = 0,5%, 1100 bp = 11%.
+     *
+     * - "termasuk": pajak ditanggung usaha. Pembeli membayar total apa
+     *   adanya, nota hanya memberi keterangan, dan pajaknya mengurangi laba.
+     * - "tambah": pajak ditambahkan ke tagihan pembeli. Uangnya masuk kas
+     *   tapi BUKAN omzet dan bukan laba — nanti disetor ke negara.
+     */
+    pajakNama: text("pajak_nama"),
+    pajakBp: integer("pajak_bp").notNull().default(0),
+    pajakMode: text("pajak_mode", { enum: ["termasuk", "tambah"] })
+      .notNull()
+      .default("termasuk"),
     isActive: integer("is_active").notNull().default(1),
     ...timestamps,
   },
@@ -174,6 +202,11 @@ export const customers = sqliteTable(
     name: text("name").notNull(),
     phone: text("phone"), // dinormalisasi ke format 62xxx
     note: text("note"),
+    /**
+     * Diskon langganan dalam basis poin (500 = 5%), otomatis dipakai di kasir
+     * begitu pelanggannya dipilih. 0 = tidak ada diskon khusus.
+     */
+    diskonBp: integer("diskon_bp").notNull().default(0),
     isActive: integer("is_active").notNull().default(1),
     ...timestamps,
   },
@@ -206,6 +239,18 @@ export const transactions = sqliteTable(
     status: text("status", { enum: ["paid", "debt", "void"] })
       .notNull()
       .default("paid"),
+    /**
+     * Pajak penjualan, snapshot dari pengaturan outlet saat transaksi dibuat.
+     *
+     * `total` TETAP penjualan bersih tanpa pajak "tambah" — semua laporan
+     * omzet dan laba memakai kolom itu, jadi memasukkan pajak ke dalamnya
+     * akan menggelembungkan omzet tiap toko yang memungut pajak. Uang yang
+     * benar-benar diterima = total + tax_amount (khusus mode "tambah"), dan
+     * itulah yang dipakai arus kas serta rekonsiliasi.
+     */
+    taxAmount: integer("tax_amount").notNull().default(0),
+    taxLabel: text("tax_label"),
+    taxMode: text("tax_mode", { enum: ["termasuk", "tambah"] }),
     occurredAt: integer("occurred_at").notNull(),
     businessDate: text("business_date").notNull(), // YYYY-MM-DD lokal outlet
     note: text("note"),
@@ -828,6 +873,61 @@ export const otherIncomes = sqliteTable(
   (t) => [index("idx_other_incomes_outlet_date").on(t.outletId, t.businessDate)],
 );
 
+/* ------------------------------------------------- trafik halaman depan */
+
+/**
+ * Jejak pengunjung halaman publik (/beranda, /register, /masuk): berapa orang
+ * datang, tombol apa yang diklik, bagian mana yang dibaca, dan berapa yang
+ * akhirnya mendaftar.
+ *
+ * Ini data PLATFORM, bukan data usaha — tidak punya `outlet_id` dan hanya
+ * bisa dilihat akun yang tercantum di SYNONA_ADMIN_TRAFIK (lihat
+ * src/server/trafik.ts).
+ *
+ * Sengaja anonim: tidak ada IP, tidak ada user-agent mentah. `pengunjung`
+ * adalah id acak yang dibuat peramban sendiri, jadi satu orang di dua HP
+ * terhitung dua pengunjung — itu harga yang diterima demi tidak menyimpan
+ * data pribadi calon pelanggan.
+ */
+export const jejakPengunjung = sqliteTable(
+  "jejak_pengunjung",
+  {
+    id: id(),
+    /** Id acak per peramban (cookie synona_pgj, 1 tahun). */
+    pengunjung: text("pengunjung").notNull(),
+    /** Id acak per tab/kunjungan (sessionStorage). */
+    kunjungan: text("kunjungan").notNull(),
+    /**
+     * lihat  = halaman dibuka
+     * klik   = tombol/tautan bertanda data-jejak diklik
+     * baca   = bagian halaman (section) terlihat di layar
+     * daftar = pendaftaran usaha berhasil (dicatat di server, bukan klien)
+     * masuk  = login berhasil (dicatat di server) — penanda PELANGGAN LAMA:
+     *          semua jejak pengunjung ini dipisahkan dari calon pelanggan.
+     */
+    jenis: text("jenis", {
+      enum: ["lihat", "klik", "baca", "daftar", "masuk"],
+    }).notNull(),
+    halaman: text("halaman").notNull(),
+    /** Nama tombol / bagian, mis. "hero:mulai" atau "fitur". */
+    target: text("target"),
+    /** Host perujuk saja (mis. "instagram.com"), bukan URL lengkapnya. */
+    rujukan: text("rujukan"),
+    utmSource: text("utm_source"),
+    utmCampaign: text("utm_campaign"),
+    perangkat: text("perangkat", { enum: ["hp", "tablet", "desktop"] }),
+    /** YYYY-MM-DD zona Asia/Jakarta — kunci pengelompokan harian. */
+    tanggal: text("tanggal").notNull(),
+    dibuatPada: integer("dibuat_pada")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    index("idx_jejak_tanggal_jenis").on(t.tanggal, t.jenis),
+    index("idx_jejak_pengunjung").on(t.pengunjung),
+  ],
+);
+
 /* ------------------------------------------------------- autentikasi */
 
 /**
@@ -895,6 +995,107 @@ export const pengguna = sqliteTable(
   ],
 );
 
+/**
+ * Tagihan langganan Synona (bukan penjualan usaha). Awalnya dibayar lewat
+ * QRIS statis milik Synona, lalu disetujui manual oleh pengelola platform.
+ *
+ * `nominal` = harga paket + `kode_unik` (1–499): tiga digit terakhir itulah
+ * yang dicocokkan pengelola dengan mutasi QRIS, karena QRIS statis tidak
+ * membawa nomor tagihan.
+ *
+ * Alur status: menunggu (tagihan dibuat) → diperiksa (pendaftar menekan
+ * "Saya sudah bayar") → disetujui / ditolak. "batal" = diganti tagihan baru.
+ */
+export const pembayaranLangganan = sqliteTable(
+  "pembayaran_langganan",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    paket: text("paket", { enum: ["mulai", "tumbuh", "juara"] }).notNull(),
+    periode: text("periode", { enum: ["bulan", "tahun"] }).notNull(),
+    harga: integer("harga").notNull(),
+    kodeUnik: integer("kode_unik").notNull(),
+    nominal: integer("nominal").notNull(),
+    status: text("status", {
+      enum: ["menunggu", "diperiksa", "disetujui", "ditolak", "batal"],
+    })
+      .notNull()
+      .default("menunggu"),
+    /** Nama berkas bukti bayar di data/uploads/bukti; opsional. */
+    bukti: text("bukti"),
+    /** Alasan penolakan dari pengelola. */
+    catatan: text("catatan"),
+    dibuatPada: integer("dibuat_pada")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+    dibayarPada: integer("dibayar_pada"),
+    diputuskanPada: integer("diputuskan_pada"),
+    diputuskanOleh: text("diputuskan_oleh").references(() => pengguna.id, {
+      onDelete: "set null",
+    }),
+    berlakuDari: integer("berlaku_dari"),
+    berlakuSampai: integer("berlaku_sampai"),
+  },
+  (t) => [
+    index("idx_bayar_langganan_status").on(t.status, t.dibuatPada),
+    index("idx_bayar_langganan_user").on(t.userId, t.dibuatPada),
+  ],
+);
+
+/** Pengaturan milik platform Synona sendiri (mis. gambar QRIS penerima). */
+export const pengaturanPlatform = sqliteTable("pengaturan_platform", {
+  kunci: text("kunci").primaryKey(),
+  nilai: text("nilai"),
+  diubahPada: integer("diubah_pada")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
+/**
+ * Promo/event diskon: "semua barang diskon 10% hari Minggu", "minyak goreng
+ * turun 5% sepekan ini".
+ *
+ * Tarifnya basis poin (1000 = 10%) supaya diskon pecahan seperti 2,5% tetap
+ * bilangan bulat. Masa berlakunya memakai tanggal usaha (YYYY-MM-DD), bukan
+ * timestamp: pemilik warung berpikir dalam satuan hari, dan tanggal usaha
+ * sudah mengikuti zona waktu outlet.
+ */
+export const promos = sqliteTable(
+  "promos",
+  {
+    id: id(),
+    outletId: text("outlet_id")
+      .notNull()
+      .references(() => outlets.id, { onDelete: "cascade" }),
+    nama: text("nama").notNull(),
+    /** semua = seluruh produk; produk/kategori = lihat tabel promo_targets. */
+    tipe: text("tipe", { enum: ["semua", "produk", "kategori"] }).notNull(),
+    diskonBp: integer("diskon_bp").notNull(),
+    mulai: text("mulai").notNull(),
+    /** NULL = tanpa tanggal berakhir. */
+    selesai: text("selesai"),
+    aktif: integer("aktif").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [index("idx_promo_outlet").on(t.outletId, t.aktif, t.mulai)],
+);
+
+/** Sasaran promo bertipe produk/kategori. */
+export const promoTargets = sqliteTable(
+  "promo_targets",
+  {
+    id: id(),
+    promoId: text("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    productId: text("product_id").references(() => products.id, { onDelete: "cascade" }),
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "cascade" }),
+  },
+  (t) => [index("idx_promo_target").on(t.promoId)],
+);
+
 export type Product = typeof products.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Debt = typeof debts.$inferSelect;
@@ -902,6 +1103,7 @@ export type Customer = typeof customers.$inferSelect;
 export type Material = typeof materials.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Pengguna = typeof pengguna.$inferSelect;
+export type Promo = typeof promos.$inferSelect;
 export type CashAccount = typeof cashAccounts.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type ServiceOrder = typeof serviceOrders.$inferSelect;

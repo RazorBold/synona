@@ -16,7 +16,7 @@ import {
 } from "@/db/schema";
 import { businessDate } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 import { getKebutuhanBahan } from "@/server/queries/produksi";
 
 export type HasilAksi =
@@ -47,7 +47,7 @@ export async function catatProduksi(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const waktu = Date.now();
   const tanggal = businessDate(new Date(), outlet.timezone);
 
@@ -195,7 +195,7 @@ export async function catatProduksi(input: unknown): Promise<HasilAksi> {
 
 export async function ambilKebutuhanBahan(productId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const milik = db.get<{ n: number }>(
     sql`SELECT COUNT(*) AS n FROM products
          WHERE id = ${productId} AND outlet_id = ${outlet.id}`,

@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, asc, eq, lte, ne, sql } from "drizzle-orm";
 
+import { cookies } from "next/headers";
+
 import { db } from "@/db";
 import {
   customers,
@@ -12,11 +14,11 @@ import {
   staff,
   users,
 } from "@/db/schema";
+import { NAMA_COOKIE_OUTLET } from "@/lib/auth-const";
 import { businessDate, rentangHari, tambahHari } from "@/lib/date";
+import { statusLangganan } from "@/lib/paket";
 import { wajibSesi } from "@/server/auth";
 import { getBebanHarianEfektif } from "@/server/queries/beban";
-import { getRadar } from "@/server/queries/radar";
-import { getPertanyaanCerdas } from "@/server/queries/tanya";
 
 const KOLOM_OUTLET = {
   id: outlets.id,
@@ -28,6 +30,12 @@ const KOLOM_OUTLET = {
   ownerPhone: users.phone,
   plan: users.plan,
   planEndsAt: users.planEndsAt,
+  trialEndsAt: users.trialEndsAt,
+  wajibBayar: users.wajibBayar,
+  qrisGambar: outlets.qrisGambar,
+  pajakNama: outlets.pajakNama,
+  pajakBp: outlets.pajakBp,
+  pajakMode: outlets.pajakMode,
 };
 
 /**
@@ -50,7 +58,7 @@ export async function getOutletAktif() {
   const sesi = await wajibSesi();
 
   const akun = db
-    .select({ userId: pengguna.userId })
+    .select({ userId: pengguna.userId, peran: pengguna.peran })
     .from(pengguna)
     .where(eq(pengguna.id, sesi.penggunaId))
     .get();
@@ -62,18 +70,41 @@ export async function getOutletAktif() {
    * bisa jadi milik usaha orang lain.
    */
   if (akun?.userId) {
+    const keanggotaan = and(
+      eq(staff.userId, akun.userId),
+      eq(staff.isActive, 1),
+      eq(outlets.isActive, 1),
+    );
+
+    /**
+     * Pemilik dengan beberapa outlet memilih outlet lewat cookie. Nilai
+     * cookie tidak pernah dipercaya apa adanya: id itu hanya dipakai kalau
+     * pengguna memang anggota aktif outlet tersebut (syarat `keanggotaan`
+     * ikut di WHERE). Kasir tidak berpindah — cookie-nya diabaikan.
+     */
+    if (akun.peran === "pemilik") {
+      const dipilih = (await cookies()).get(NAMA_COOKIE_OUTLET)?.value;
+      if (dipilih) {
+        const cocok = db
+          .select(KOLOM_OUTLET)
+          .from(staff)
+          .innerJoin(outlets, eq(outlets.id, staff.outletId))
+          .innerJoin(users, eq(users.id, outlets.ownerId))
+          .where(and(keanggotaan, eq(outlets.id, dipilih)))
+          .get();
+        if (cocok) return cocok;
+      }
+    }
+
+    // Urutan dibuat tetap (outlet tertua dulu) supaya outlet bawaan tidak
+    // berganti-ganti mengikuti urutan baris di SQLite.
     const milikSesi = db
       .select(KOLOM_OUTLET)
       .from(staff)
       .innerJoin(outlets, eq(outlets.id, staff.outletId))
       .innerJoin(users, eq(users.id, outlets.ownerId))
-      .where(
-        and(
-          eq(staff.userId, akun.userId),
-          eq(staff.isActive, 1),
-          eq(outlets.isActive, 1),
-        ),
-      )
+      .where(keanggotaan)
+      .orderBy(asc(outlets.createdAt))
       .limit(1)
       .get();
 
@@ -100,6 +131,52 @@ export async function getOutletAktif() {
   return warisan;
 }
 
+/**
+ * `getOutletAktif()` untuk server action yang MENGUBAH data. Menolak kalau
+ * langganan usaha ini belum aktif atau sudah habis — di situ aplikasinya
+ * hanya-baca. Aksi yang cuma membaca tetap memakai `getOutletAktif()`.
+ *
+ * Yang diperiksa adalah langganan PEMILIK outlet, jadi kasirnya ikut
+ * tertahan bersama pemiliknya.
+ */
+export async function getOutletMenulis() {
+  const outlet = await getOutletAktif();
+  const status = statusLangganan(outlet);
+  if (status === "belum-aktif") {
+    throw new Error("Langganan belum aktif. Buka halaman Langganan untuk mengaktifkannya.");
+  }
+  if (status === "habis") {
+    throw new Error(
+      "Masa coba/langganan sudah berakhir — data hanya bisa dilihat. Perpanjang di halaman Langganan untuk mencatat lagi.",
+    );
+  }
+  return outlet;
+}
+
+/**
+ * Outlet yang boleh dibuka akun sesi — untuk tombol pemindah outlet.
+ * Kasir selalu mendapat daftar kosong: ia terkunci di outletnya.
+ */
+export async function getOutletSaya(): Promise<{ id: string; nama: string }[]> {
+  const sesi = await wajibSesi();
+  const akun = db
+    .select({ userId: pengguna.userId, peran: pengguna.peran })
+    .from(pengguna)
+    .where(eq(pengguna.id, sesi.penggunaId))
+    .get();
+  if (!akun?.userId || akun.peran !== "pemilik") return [];
+
+  return db
+    .select({ id: outlets.id, nama: outlets.name })
+    .from(staff)
+    .innerJoin(outlets, eq(outlets.id, staff.outletId))
+    .where(
+      and(eq(staff.userId, akun.userId), eq(staff.isActive, 1), eq(outlets.isActive, 1)),
+    )
+    .orderBy(asc(outlets.createdAt))
+    .all();
+}
+
 export type RingkasanHarian = {
   omzet: number;
   laba: number;
@@ -120,6 +197,7 @@ const labaExpr = sql`
   (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
      FROM transaction_items i
     WHERE i.transaction_id = tx.id) - tx.discount
+  - CASE WHEN tx.tax_mode = 'termasuk' THEN tx.tax_amount ELSE 0 END
 `;
 
 export async function getRingkasanTanggal(
@@ -178,6 +256,71 @@ export async function getSeriesHarian(
     penjualan: map.get(tanggal)?.penjualan ?? 0,
     laba: map.get(tanggal)?.laba ?? 0,
     jumlah: map.get(tanggal)?.jumlah ?? 0,
+  }));
+}
+
+export type TitikUangMasuk = {
+  tanggal: string;
+  penjualan: number;
+  cicilan: number;
+  lain: number;
+};
+
+/**
+ * Uang yang benar-benar masuk per hari — definisinya sama dengan `masuk` di
+ * `getArusKas`: penjualan lunas + cicilan kasbon + pemasukan lain (modal,
+ * pinjaman, hibah). Penjualan kasbon baru dihitung saat cicilannya dibayar.
+ */
+export async function getSeriesUangMasuk(
+  outletId: string,
+  sampai: string,
+  jumlahHari: number,
+  timezone: string,
+): Promise<TitikUangMasuk[]> {
+  const dari = tambahHari(sampai, -(jumlahHari - 1));
+
+  const penjualan = db.all<{ tanggal: string; total: number }>(sql`
+    SELECT business_date AS tanggal,
+           COALESCE(SUM(total + CASE WHEN tax_mode = 'tambah' THEN tax_amount ELSE 0 END), 0) AS total
+      FROM transactions
+     WHERE outlet_id = ${outletId} AND status = 'paid'
+       AND business_date BETWEEN ${dari} AND ${sampai}
+     GROUP BY business_date
+  `);
+
+  const lain = db.all<{ tanggal: string; total: number }>(sql`
+    SELECT business_date AS tanggal, COALESCE(SUM(amount), 0) AS total
+      FROM other_incomes
+     WHERE outlet_id = ${outletId}
+       AND business_date BETWEEN ${dari} AND ${sampai}
+     GROUP BY business_date
+  `);
+
+  // Cicilan hanya punya `paid_at`. Ambil dengan jendela sehari lebih lebar,
+  // lalu kelompokkan per tanggal usaha di zona waktu outlet.
+  const awal = new Date(`${tambahHari(dari, -1)}T00:00:00Z`).getTime();
+  const akhir = new Date(`${tambahHari(sampai, 2)}T00:00:00Z`).getTime();
+  const cicilanMentah = db.all<{ paidAt: number; amount: number }>(sql`
+    SELECT p.paid_at AS paidAt, p.amount AS amount
+      FROM debt_payments p
+      JOIN debts d ON d.id = p.debt_id
+     WHERE d.outlet_id = ${outletId}
+       AND p.paid_at BETWEEN ${awal} AND ${akhir}
+  `);
+
+  const cicilan = new Map<string, number>();
+  for (const c of cicilanMentah) {
+    const tgl = businessDate(new Date(c.paidAt), timezone);
+    cicilan.set(tgl, (cicilan.get(tgl) ?? 0) + c.amount);
+  }
+
+  const mapJual = new Map(penjualan.map((r) => [r.tanggal, r.total]));
+  const mapLain = new Map(lain.map((r) => [r.tanggal, r.total]));
+  return rentangHari(sampai, jumlahHari).map((tanggal) => ({
+    tanggal,
+    penjualan: mapJual.get(tanggal) ?? 0,
+    cicilan: cicilan.get(tanggal) ?? 0,
+    lain: mapLain.get(tanggal) ?? 0,
   }));
 }
 
@@ -374,6 +517,7 @@ export async function getDataDashboard(jumlahHari = 7) {
     ringkasan,
     ringkasanKemarin,
     series,
+    uangMasuk,
     seriesPiutang,
     pembayaran,
     utang,
@@ -381,13 +525,12 @@ export async function getDataDashboard(jumlahHari = 7) {
     stok,
     beban,
     bebanKemarin,
-    radar,
     antrean,
-    tanya,
   ] = await Promise.all([
     getRingkasanTanggal(outlet.id, hariIni),
     getRingkasanTanggal(outlet.id, kemarin),
     getSeriesHarian(outlet.id, hariIni, jumlahHari),
+    getSeriesUangMasuk(outlet.id, hariIni, jumlahHari, outlet.timezone),
     getSeriesPiutang(outlet.id, hariIni, 7),
     getPembayaranTanggal(outlet.id, hariIni),
     getRingkasanUtang(outlet.id),
@@ -395,9 +538,7 @@ export async function getDataDashboard(jumlahHari = 7) {
     getStokMenipis(outlet.id, 4),
     getBebanHarianEfektif(outlet.id, hariIni),
     getBebanHarianEfektif(outlet.id, kemarin),
-    getRadar(outlet.id, hariIni, outlet.jenisUsaha),
     getAntreanRingkas(outlet.id, hariIni),
-    getPertanyaanCerdas(outlet.id, hariIni, outlet.jenisUsaha),
   ]);
 
   return {
@@ -407,6 +548,7 @@ export async function getDataDashboard(jumlahHari = 7) {
     ringkasan,
     ringkasanKemarin,
     series,
+    uangMasuk,
     seriesPiutang,
     pembayaran,
     utang,
@@ -414,9 +556,7 @@ export async function getDataDashboard(jumlahHari = 7) {
     stok,
     beban,
     bebanKemarin,
-    radar,
     antrean,
-    tanya,
     // Laba bersih = laba kotor - beban hari itu (PRD-TEKNIS.md §16.5)
     labaBersih: ringkasan.laba - beban,
     labaBersihKemarin: ringkasanKemarin.laba - bebanKemarin,

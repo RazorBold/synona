@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PembayaranOutlet } from "@/components/outlet/pembayaran-outlet";
 import { AvatarInisial } from "@/components/ui/avatar-inisial";
 import { IconButton } from "@/components/ui/icon-button";
 import { formatRupiah } from "@/lib/money";
@@ -40,12 +41,14 @@ export function OutletClient({
   pemilik,
   jenisUsaha,
   berlakuSampai,
+  pembayaran,
 }: {
   outlet: BarisOutlet[];
   staf: BarisStaf[];
   pemilik: { id: string; nama: string; email: string; telepon: string | null; paket: Paket };
   jenisUsaha: JenisUsaha | null;
   berlakuSampai: string;
+  pembayaran: React.ComponentProps<typeof PembayaranOutlet>;
 }) {
   const batas = PAKET[pemilik.paket];
   const outletAktif = outlet.filter((o) => o.aktif === 1).length;
@@ -233,6 +236,12 @@ export function OutletClient({
       </section>
 
       {/* Daftar staf */}
+      <PembayaranOutlet
+        namaOutlet={pembayaran.namaOutlet}
+        qris={pembayaran.qris}
+        pajak={pembayaran.pajak}
+      />
+
       <section className="card min-w-0 p-5">
         <h2 className="card-title text-[17px]">Staf</h2>
         {!batas.bolehMultiStaf && (

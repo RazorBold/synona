@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Landmark,
   Loader2,
+  Printer,
   QrCode,
   TriangleAlert,
   UserPlus,
@@ -13,16 +14,26 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { WhatsAppIcon } from "@/components/icons/whatsapp";
 import { businessDate, tambahHari } from "@/lib/date";
+import { persenDiskon } from "@/lib/diskon";
 import { formatRupiah } from "@/lib/money";
+import {
+  hitungPajak,
+  labelPajak,
+  totalDibayar,
+  type PengaturanPajak,
+} from "@/lib/pajak";
 import { cn } from "@/lib/utils";
 import { buildWaLink, pesanStruk } from "@/lib/wa";
 import { simpanTransaksi, type HasilTransaksi } from "@/server/actions/transaksi";
-import { diskonBaris, hitungTotal, useCart } from "@/store/cart";
+import { hitungTotal, useCart } from "@/store/cart";
 import { aman } from "@/lib/aksi";
+import { cetakNota } from "@/lib/printer/cetak";
+import { usePrinter } from "@/lib/printer/pengaturan";
+import { ambilNota } from "@/server/actions/nota";
 
 type Metode = "cash" | "qris" | "transfer" | "debt";
 
@@ -38,14 +49,21 @@ export function PaymentDialog({
   onOpenChange,
   pelanggan,
   namaToko,
+  qris,
+  pajak,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  pelanggan: { id: string; nama: string; phone: string | null }[];
+  pelanggan: { id: string; nama: string; phone: string | null; diskonBp: number }[];
   namaToko: string;
+  qris: string | null;
+  pajak: PengaturanPajak;
 }) {
-  const { items, kosongkan } = useCart();
-  const total = hitungTotal(items);
+  const { items, kosongkan, memberBp, setMember } = useCart();
+  const total = hitungTotal(items, memberBp);
+  const nilaiPajak = hitungPajak(total, pajak);
+  // Yang harus dibayar pembeli: pajak "tambah" menambah tagihan.
+  const tagihan = totalDibayar(total, nilaiPajak, pajak.mode);
 
   const [metode, setMetode] = useState<Metode>("cash");
   const [uang, setUang] = useState<number>(0);
@@ -61,8 +79,8 @@ export function PaymentDialog({
   >(null);
   const [teleponStruk, setTeleponStruk] = useState("");
 
-  const kembalian = Math.max(0, uang - total);
-  const kurang = metode === "cash" && uang < total;
+  const kembalian = Math.max(0, uang - tagihan);
+  const kurang = metode === "cash" && uang < tagihan;
 
   // Nama yang persis sama (tanpa peduli huruf besar) dianggap pelanggan lama;
   // selain itu pelanggan baru yang dibuatkan otomatis oleh server.
@@ -71,6 +89,16 @@ export function PaymentDialog({
     ? pelanggan.find((p) => p.nama.toLowerCase() === namaBersih.toLowerCase()) ?? null
     : null;
   const pelangganBaru = Boolean(namaBersih) && !cocok;
+
+  /**
+   * Diskon member ikut keranjang, bukan cuma dialog ini: totalnya dipakai
+   * juga oleh panel keranjang dan tombol Bayar, jadi angka yang dilihat
+   * kasir dan pembeli selalu sama.
+   */
+  useEffect(() => {
+    const bp = cocok?.diskonBp ?? 0;
+    setMember(bp, bp > 0 ? (cocok?.nama ?? null) : null);
+  }, [cocok, setMember]);
 
   function tutup(v: boolean) {
     onOpenChange(v);
@@ -93,9 +121,9 @@ export function PaymentDialog({
     setError(null);
 
     const hasil = await aman(simpanTransaksi({
-      items: items.map((i) => ({ productId: i.id, qty: i.qty, diskon: diskonBaris(i) })),
+      items: items.map((i) => ({ productId: i.id, qty: i.qty, diskon: i.diskon ?? 0 })),
       paymentMethod: metode,
-      paidAmount: metode === "cash" ? uang : total,
+      paidAmount: metode === "cash" ? uang : tagihan,
       customerId: cocok?.id ?? null,
       namaPelanggan: cocok ? null : namaBersih || null,
       teleponPelanggan: pelangganBaru ? teleponPelanggan.trim() || null : null,
@@ -117,19 +145,19 @@ export function PaymentDialog({
 
   // Saran uang: pembulatan ke atas dari total + pecahan uang yang lazim.
   const nominalCepat = [
-    total,
+    tagihan,
     ...[
       ...new Set([
-        Math.ceil(total / 5_000) * 5_000,
-        Math.ceil(total / 10_000) * 10_000,
-        Math.ceil(total / 50_000) * 50_000,
+        Math.ceil(tagihan / 5_000) * 5_000,
+        Math.ceil(tagihan / 10_000) * 10_000,
+        Math.ceil(tagihan / 50_000) * 50_000,
         20_000,
         50_000,
         100_000,
         200_000,
       ]),
     ]
-      .filter((n) => n > total)
+      .filter((n) => n > tagihan)
       .sort((a, b) => a - b)
       .slice(0, 4),
   ];
@@ -167,8 +195,20 @@ export function PaymentDialog({
                 <div className="rounded-2xl bg-gradient-to-r from-brand-50 to-violet-50 px-5 py-4 text-center">
                   <p className="text-sm font-medium text-muted">Total Bayar</p>
                   <p className="tabular mt-1 text-[32px] font-extrabold tracking-tight text-ink">
-                    {formatRupiah(total)}
+                    {formatRupiah(tagihan)}
                   </p>
+                  {cocok && cocok.diskonBp > 0 && (
+                    <p className="mt-1 text-xs font-semibold text-brand-600">
+                      Diskon member {persenDiskon(cocok.diskonBp)} sudah dipakai
+                    </p>
+                  )}
+                  {nilaiPajak > 0 && (
+                    <p className="mt-1 text-xs text-muted">
+                      {pajak.mode === "tambah"
+                        ? `Belanja ${formatRupiah(total)} + ${labelPajak(pajak)} ${formatRupiah(nilaiPajak)}`
+                        : `Termasuk ${labelPajak(pajak)} ${formatRupiah(nilaiPajak)}`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-5 grid grid-cols-4 gap-2">
@@ -239,7 +279,7 @@ export function PaymentDialog({
                           kurang ? "text-danger" : "text-emerald-700",
                         )}
                       >
-                        {formatRupiah(kurang ? total - uang : kembalian)}
+                        {formatRupiah(kurang ? tagihan - uang : kembalian)}
                       </span>
                     </div>
                   </div>
@@ -249,13 +289,25 @@ export function PaymentDialog({
                   <div className="mt-5 flex flex-col items-center rounded-2xl border border-line bg-canvas px-5 py-6">
                     {metode === "qris" ? (
                       <>
-                        <KodeQr />
+                        {qris ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={qris}
+                            alt="QRIS usaha"
+                            className="w-full max-w-[280px] rounded-2xl bg-white p-2 shadow-card"
+                          />
+                        ) : (
+                          <KodeQr />
+                        )}
                         <p className="mt-4 text-sm font-semibold text-ink">
-                          Minta pelanggan memindai QRIS
+                          {qris
+                            ? "Minta pelanggan memindai QRIS"
+                            : "QRIS belum dipasang"}
                         </p>
                         <p className="mt-1 text-center text-xs text-muted">
-                          MVP memakai QRIS statis milik outlet. Tandai lunas
-                          setelah notifikasi masuk.
+                          {qris
+                            ? "Tandai lunas setelah notifikasi pembayaran masuk."
+                            : "Gambar di atas hanya contoh dan tidak bisa dipindai. Pemilik bisa memasang QRIS usaha di Pengaturan → Outlet & Staf."}
                         </p>
                       </>
                     ) : (
@@ -396,6 +448,36 @@ function LayarSukses({
   setTelepon: (v: string) => void;
   onSelesai: () => void;
 }) {
+  const printer = usePrinter();
+  const [cetak, setCetak] = useState<
+    { status: "idle" | "proses" | "ok" } | { status: "gagal"; pesan: string }
+  >({ status: "idle" });
+  const sudahOtomatis = useRef(false);
+
+  async function cetakSekarang() {
+    setCetak({ status: "proses" });
+    try {
+      const r = await aman(ambilNota(hasil.id));
+      if (!r.ok) throw new Error(r.error);
+      await cetakNota(r.nota, printer);
+      setCetak({ status: "ok" });
+    } catch (e) {
+      setCetak({
+        status: "gagal",
+        pesan: e instanceof Error ? e.message : "Nota gagal dicetak",
+      });
+    }
+  }
+
+  // Cetak otomatis sekali saja per transaksi. Mode "printer biasa" tidak
+  // ikut: membuka tab baru tanpa klik akan diblokir browser.
+  useEffect(() => {
+    if (sudahOtomatis.current) return;
+    sudahOtomatis.current = true;
+    if (printer.otomatis && printer.mode !== "browser") void cetakSekarang();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const pesan = pesanStruk({
     nama: hasil.pelanggan?.nama ?? "kak",
     toko: namaToko,
@@ -424,6 +506,15 @@ function LayarSukses({
             {formatRupiah(hasil.total)}
           </span>
         </div>
+        {hasil.pajak > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-muted">{hasil.labelPajak}</span>
+            <span className="tabular font-semibold text-ink">
+              {hasil.modePajak === "tambah" ? "+ " : "termasuk "}
+              {formatRupiah(hasil.pajak)}
+            </span>
+          </div>
+        )}
         {hasil.kembalian > 0 && (
           <div className="flex items-center justify-between">
             <span className="text-muted">Kembalian</span>
@@ -433,6 +524,32 @@ function LayarSukses({
           </div>
         )}
       </div>
+
+      <button
+        onClick={cetakSekarang}
+        disabled={cetak.status === "proses"}
+        className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 text-sm font-bold text-brand-600 transition-colors hover:bg-brand-100 disabled:opacity-60"
+      >
+        {cetak.status === "proses" ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Printer className="size-4" />
+        )}
+        {cetak.status === "proses"
+          ? "Mencetak nota…"
+          : cetak.status === "ok"
+            ? "Cetak ulang nota"
+            : "Cetak nota"}
+      </button>
+      {cetak.status === "ok" && printer.mode === "bluetooth" && (
+        <p className="mt-2 text-xs font-medium text-success">Nota terkirim ke printer.</p>
+      )}
+      {cetak.status === "gagal" && (
+        <p className="mt-2 flex items-start gap-1.5 text-left text-xs font-medium text-danger">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+          {cetak.pesan}
+        </p>
+      )}
 
       <div className="mt-5 text-left">
         <label className="text-sm font-semibold text-ink">

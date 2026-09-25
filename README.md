@@ -35,6 +35,7 @@ npm run dev           # http://localhost:3000
 | `npm run db:studio` | Drizzle Studio (penjelajah data) |
 | `npm run auth:init` | Seed akun demo `admin` / `admin` (idempoten) |
 | `npm run auth:reset [nama]` | Reset sandi dari server — jalan terakhir kalau sandi & kode pemulihan hilang |
+| `npm run platform:admin [nama]` | Buat akun pengelola SaaS (outlet kosong sendiri) untuk membuka `/trafik` |
 | `npm run data:kosongkan` | Hapus data usaha demo, siapkan outlet kosong (pratinjau dulu; butuh `--ya`) |
 
 ## Struktur singkat
@@ -188,6 +189,18 @@ Server action bisa **melempar**, bukan cuma mengembalikan `{ ok: false }` — se
 Tanpa pembungkus itu, promise-nya ditolak, baris `setPending(false)` di bawahnya tidak pernah jalan, dan **tombolnya berputar selamanya** tanpa pesan apa pun. `aman()` sengaja meneruskan lemparan `NEXT_REDIRECT`, karena `redirect()` di server action memang bekerja dengan cara melempar.
 
 Galat render ditangani `src/app/error.tsx` (dan `global-error.tsx` sebagai jaring terakhir), sementara alamat yang tidak ada masuk ke `src/app/not-found.tsx`. Ketiganya berbahasa Indonesia — bawaan Next adalah layar Inggris "Application error: a client-side exception has occurred" yang tidak berarti apa-apa bagi pemilik warung.
+
+## Trafik pengunjung (`/trafik`)
+
+Halaman publik `/beranda`, `/register`, dan `/masuk` mencatat jejak anonim ke tabel `jejak_pengunjung`: halaman dibuka, tombol bertanda `data-jejak="…"` diklik, bagian bertanda `data-jejak-bagian="…"` digulir, dan pendaftaran yang berhasil (dicatat di server action `daftar()`, bukan dari peramban). Laporannya — alur minat pengunjung → tertarik → buka form daftar → berhasil daftar, tren harian, tombol terlaris, sumber, perangkat — ada di `/trafik`.
+
+- **Pelanggan lama vs calon pelanggan:** login berhasil (`masuk()`) menandai id pengunjung peramban itu sebagai pelanggan lama — berlaku mundur, jadi kunjungan beranda dan klik "Masuk" sebelum login ikut pindah ke segmen pelanggan lama dan tidak menggelembungkan corong calon pelanggan. Pengecualian: yang mendaftar di periode yang dilihat tetap dihitung calon. Tahap corong dihitung bertingkat ("sampai tahap ini atau lebih jauh").
+- **Anonim:** id pengunjung acak di cookie `synona_pgj`; IP hanya dipakai untuk membatasi laju di memori, tidak disimpan.
+- **Tidak dihitung:** pengunjung yang sedang login, bot (user-agent & `navigator.webdriver`).
+- **Akses:** data platform, bukan data usaha — hanya akun di `SYNONA_ADMIN_TRAFIK` (`.env`, dipisah koma). Pemilik usaha lain mendapat 404.
+- **Akun pengelola:** `npm run platform:admin [nama]` membuat akun dengan outlet kosongnya sendiri (jangan pakai akun tanpa `user_id` — ia jatuh ke outlet pertama, milik usaha lain). Sandi acak ditambahkan ke `.sandi-baru.txt`.
+- **Tombol baru di halaman depan** cukup diberi atribut `data-jejak="bagian:nama"`; beri label manusiawinya di `LABEL_TARGET` (`src/lib/trafik.ts`).
+- Endpoint `POST /api/jejak` sengaja publik (dikecualikan di middleware) dan hanya menerima tulisan berskema ketat.
 
 ## Catatan deploy
 

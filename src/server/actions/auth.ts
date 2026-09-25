@@ -3,12 +3,14 @@
 import { eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { redirect } from "next/navigation";
+import { addDays } from "date-fns";
 import { z } from "zod";
 
 import { db } from "@/db";
 import { outlets, pengguna, staff, users } from "@/db/schema";
 import { RUTE_GANTI_SANDI, RUTE_MASUK } from "@/lib/auth-const";
 import type { JenisUsaha } from "@/lib/usaha";
+import { HARI_MASA_COBA } from "@/lib/paket";
 import { normalisasiNomorHp } from "@/lib/wa";
 import { buatAkunKasBawaan } from "@/server/kas";
 import {
@@ -26,6 +28,7 @@ import {
   sisaMenitBlokir,
   wajibSesi,
 } from "@/server/auth";
+import { catatMasuk, catatPendaftaran } from "@/server/trafik";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -96,6 +99,7 @@ export async function masuk(input: unknown): Promise<HasilAksi> {
   }
 
   resetLoginGagal(namaPengguna);
+  await catatMasuk();
   await buatSesi({
     penggunaId: akun.id,
     namaPengguna: akun.namaPengguna,
@@ -236,6 +240,7 @@ export async function daftar(input: unknown): Promise<HasilAksi> {
   const hash = await hashSandi(d.sandi, salt);
 
   const penggunaId = nanoid();
+  const akhirMasaCoba = addDays(new Date(), HARI_MASA_COBA).getTime();
 
   try {
     db.transaction((tx) => {
@@ -257,6 +262,15 @@ export async function daftar(input: unknown): Promise<HasilAksi> {
           name: d.namaPemilik,
           phone: telepon,
           plan: "mulai",
+          /**
+           * Masa coba gratis 14 hari, langsung jalan tanpa menunggu
+           * persetujuan siapa pun. `trial_ends_at` disimpan terpisah supaya
+           * bisa dibedakan mana akun yang masih mencoba dan mana yang sudah
+           * membayar — pembayaran menggeser `plan_ends_at` melewatinya.
+           */
+          wajibBayar: 1,
+          trialEndsAt: akhirMasaCoba,
+          planEndsAt: akhirMasaCoba,
         })
         .run();
 
@@ -299,7 +313,9 @@ export async function daftar(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: e instanceof Error ? e.message : "Gagal mendaftar" };
   }
 
+  await catatPendaftaran();
   await buatSesi({ penggunaId, namaPengguna, peran: "pemilik" });
+  // Langsung ke dashboard: masa cobanya sudah berjalan sejak baris users dibuat.
   redirect("/");
 }
 

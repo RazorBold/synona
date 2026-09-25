@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { cashAccounts, cashTransfers, otherIncomes } from "@/db/schema";
 import { businessDate } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -30,7 +30,7 @@ export async function simpanAkunKas(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -108,7 +108,7 @@ export async function simpanAkunKas(input: unknown): Promise<HasilAksi> {
  */
 export async function arsipkanAkunKas(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     const sisa = db.get<{ n: number }>(sql`
@@ -147,7 +147,7 @@ export async function simpanTransferKas(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   if (d.dariAkunId === d.keAkunId) {
     return { ok: false, error: "Akun asal dan tujuan tidak boleh sama" };
@@ -184,7 +184,7 @@ export async function simpanTransferKas(input: unknown): Promise<HasilAksi> {
 
 export async function hapusTransferKas(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.delete(cashTransfers)
@@ -226,7 +226,7 @@ export async function simpanPemasukanLain(input: unknown): Promise<HasilAksi> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Data tidak valid" };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     const milik = db.get<{ id: string }>(sql`
@@ -259,7 +259,7 @@ export async function simpanPemasukanLain(input: unknown): Promise<HasilAksi> {
 
 export async function hapusPemasukanLain(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.delete(otherIncomes)
@@ -286,7 +286,7 @@ function pesan(e: unknown): string {
 /** Dipakai halaman/dialog yang butuh daftar akun tanpa memuat ulang server. */
 export async function ambilAkunKas() {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   return db.all<{ id: string; nama: string; jenis: string }>(sql`
     SELECT id, name AS nama, type AS jenis FROM cash_accounts
      WHERE outlet_id = ${outlet.id} AND is_active = 1

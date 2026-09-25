@@ -8,7 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { reconciliations } from "@/db/schema";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 import { getRingkasanKas } from "@/server/queries/rekonsiliasi";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -37,7 +37,7 @@ export async function simpanRekonsiliasi(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const sistem = await getRingkasanKas(outlet.id, d.tanggal);
 
   const selisihKas = d.kasFisik - sistem.kasSistem;

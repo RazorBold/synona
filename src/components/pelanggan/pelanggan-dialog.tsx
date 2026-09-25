@@ -21,6 +21,7 @@ export function PelangganDialog({ open, onOpenChange, pelanggan }: Props) {
   const [nama, setNama] = useState("");
   const [phone, setPhone] = useState("");
   const [catatan, setCatatan] = useState("");
+  const [diskon, setDiskon] = useState("0");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,9 @@ export function PelangganDialog({ open, onOpenChange, pelanggan }: Props) {
     setNama(pelanggan?.nama ?? "");
     setPhone(pelanggan?.phone ?? "");
     setCatatan(pelanggan?.catatan ?? "");
+    setDiskon(
+      pelanggan?.diskonBp ? String(pelanggan.diskonBp / 100).replace(".", ",") : "0",
+    );
     setError(null);
   }, [open, pelanggan]);
 
@@ -43,6 +47,7 @@ export function PelangganDialog({ open, onOpenChange, pelanggan }: Props) {
       nama,
       phone: phone.trim() || null,
       catatan: catatan.trim() || null,
+      diskonBp: Math.round(Number(diskon.replace(",", ".")) * 100) || 0,
     }));
 
     setPending(false);
@@ -100,6 +105,29 @@ export function PelangganDialog({ open, onOpenChange, pelanggan }: Props) {
                   Disimpan sebagai <span className="font-semibold">{nomorRapi}</span>
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-ink">
+                Diskon langganan{" "}
+                <span className="font-normal text-muted">(opsional)</span>
+              </label>
+              <div className="relative">
+                <input
+                  value={diskon}
+                  onChange={(e) => setDiskon(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0"
+                  className={inputKelas}
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted">
+                  %
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-muted">
+                Otomatis dipakai di kasir begitu nama ini dipilih. Kalau barangnya
+                sedang promo, yang dipakai potongan yang paling besar.
+              </p>
             </div>
 
             <div>

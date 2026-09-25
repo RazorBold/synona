@@ -10,9 +10,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { rapikanSatuan } from "@/lib/satuan";
 import { products, stockMovements } from "@/db/schema";
-import { JENIS_GAMBAR, MAKS_UKURAN_BYTE } from "@/lib/gambar";
+import { JENIS_GAMBAR, LEBAR_THUMBNAIL, MAKS_UKURAN_BYTE } from "@/lib/gambar";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 import { getRiwayatStok } from "@/server/queries/produk";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -51,6 +51,14 @@ async function hapusBerkasGambar(nama: string | null) {
   if (!nama) return;
   // Foto yatim tidak fatal, jadi kegagalan hapus cukup diabaikan.
   await fs.unlink(path.join(DIR_GAMBAR, nama)).catch(() => {});
+  // Ikut membuang thumbnail hasil /api/gambar?l=… supaya berkas kecilnya
+  // tidak menumpuk selamanya setelah fotonya diganti.
+  const dasar = nama.replace(/\.[^.]+$/, "");
+  await Promise.all(
+    LEBAR_THUMBNAIL.map((l) =>
+      fs.unlink(path.join(DIR_GAMBAR, "kecil", `${l}-${dasar}.webp`)).catch(() => {}),
+    ),
+  );
 }
 
 const ProdukInput = z.object({
@@ -114,7 +122,7 @@ export async function simpanProduk(formData: FormData): Promise<HasilAksi> {
   }
 
   // TODO(langkah 5): ganti dengan requireOutlet() berbasis sesi.
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   const berkas = formData.get("gambar");
   const adaFotoBaru = berkas instanceof File && berkas.size > 0;
@@ -245,7 +253,7 @@ export async function sesuaikanStok(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -311,7 +319,7 @@ export async function sesuaikanStok(input: unknown): Promise<HasilAksi> {
  */
 export async function arsipkanProduk(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.update(products)
@@ -330,7 +338,7 @@ export async function arsipkanProduk(id: string): Promise<HasilAksi> {
 /** Riwayat pergerakan stok satu produk (dipakai di dialog penyesuaian stok). */
 export async function ambilRiwayatStok(productId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   const milikOutlet = db
     .select({ id: products.id })

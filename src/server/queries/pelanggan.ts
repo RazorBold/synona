@@ -9,6 +9,7 @@ export type BarisPelanggan = {
   nama: string;
   phone: string | null;
   catatan: string | null;
+  diskonBp: number;
   totalBelanja: number;
   jumlahTransaksi: number;
   terakhirBelanja: number | null;
@@ -28,6 +29,7 @@ export async function getDaftarPelanggan(
            c.name                                AS nama,
            c.phone                               AS phone,
            c.note                                AS catatan,
+           c.diskon_bp                           AS diskonBp,
            c.created_at                          AS dibuat,
            COALESCE(t.total_belanja, 0)          AS totalBelanja,
            COALESCE(t.jumlah, 0)                 AS jumlahTransaksi,

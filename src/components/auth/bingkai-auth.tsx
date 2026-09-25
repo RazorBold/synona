@@ -45,7 +45,8 @@ export function BingkaiAuth({
   gambar: StaticImageData;
   judul: React.ReactNode;
   keterangan: string;
-  tautanAtas: { tanya: string; label: string; href: string };
+  /** `jejak` diteruskan ke `data-jejak` supaya kliknya ikut tercatat di trafik. */
+  tautanAtas: { tanya: string; label: string; href: string; jejak?: string };
   children: React.ReactNode;
 }) {
   /*
@@ -152,6 +153,7 @@ export function BingkaiAuth({
             {tautanAtas.tanya}
             <Link
               href={tautanAtas.href}
+              data-jejak={tautanAtas.jejak}
               className="rounded-full bg-brand-50 px-4 py-1.5 font-bold text-brand-600 transition-colors hover:bg-brand-100"
             >
               {tautanAtas.label}

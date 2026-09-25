@@ -105,6 +105,7 @@ export async function getStatistikBeban(
            COALESCE(SUM(
              (SELECT COALESCE(SUM(i.line_total - i.cost_snapshot * i.qty), 0)
                 FROM transaction_items i WHERE i.transaction_id = tx.id) - tx.discount
+             - CASE WHEN tx.tax_mode = 'termasuk' THEN tx.tax_amount ELSE 0 END
            ), 0) AS laba
       FROM transactions tx
      WHERE tx.outlet_id = ${outletId}

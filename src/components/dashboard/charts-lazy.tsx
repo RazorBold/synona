@@ -30,3 +30,8 @@ export const PaymentDonut = dynamic(
   () => import("./payment-donut").then((m) => m.PaymentDonut),
   { ssr: false, loading: () => <KerangkaKartu tinggi={220} /> },
 );
+
+export const UangMasukChart = dynamic(
+  () => import("./uang-masuk-chart").then((m) => m.UangMasukChart),
+  { ssr: false, loading: () => <KerangkaKartu tinggi={340} /> },
+);

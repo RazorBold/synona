@@ -19,7 +19,7 @@ import { businessDate } from "@/lib/date";
 import { wajibSesi } from "@/server/auth";
 import { pilihAkunKas } from "@/server/kas";
 import { getItemPesanan } from "@/server/queries/pesanan";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
 
@@ -80,7 +80,7 @@ export async function simpanPesanan(input: unknown): Promise<HasilPesanan> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const tanggal = businessDate(new Date(), outlet.timezone);
   const waktu = Date.now();
 
@@ -275,7 +275,7 @@ export async function ubahStatusPesanan(input: unknown): Promise<HasilAksi> {
   const parsed = StatusInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Status tidak valid" };
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -333,7 +333,7 @@ export async function ubahStatusPesanan(input: unknown): Promise<HasilAksi> {
  */
 export async function batalkanPesanan(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -375,7 +375,7 @@ export async function batalkanPesanan(id: string): Promise<HasilAksi> {
 /** Dipakai dialog rincian & nota WhatsApp. */
 export async function ambilItemPesanan(transactionId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   const milik = db.get<{ n: number }>(sql`
     SELECT COUNT(*) AS n FROM service_orders
@@ -388,7 +388,7 @@ export async function ambilItemPesanan(transactionId: string) {
 /** Nama & nomor pelanggan untuk tombol kirim nota. */
 export async function ambilPelangganPesanan(customerId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   return (
     db
       .select({ nama: customers.name, phone: customers.phone })

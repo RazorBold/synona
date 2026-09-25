@@ -17,7 +17,7 @@ import {
 import { businessDate } from "@/lib/date";
 import { perbaruiHppTerkaitBahan } from "@/server/hpp";
 import { wajibSesi } from "@/server/auth";
-import { getOutletAktif } from "@/server/queries/dashboard";
+import { getOutletMenulis } from "@/server/queries/dashboard";
 import { getRiwayatBahan } from "@/server/queries/persediaan";
 
 export type HasilAksi = { ok: true } | { ok: false; error: string };
@@ -47,7 +47,7 @@ export async function simpanBahan(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -148,7 +148,7 @@ export async function sesuaikanStokBahan(input: unknown): Promise<HasilAksi> {
     };
   }
   const d = parsed.data;
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.transaction((tx) => {
@@ -210,7 +210,7 @@ export async function sesuaikanStokBahan(input: unknown): Promise<HasilAksi> {
 
 export async function arsipkanBahan(id: string): Promise<HasilAksi> {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
 
   try {
     db.update(materials)
@@ -227,7 +227,7 @@ export async function arsipkanBahan(id: string): Promise<HasilAksi> {
 
 export async function ambilRiwayatBahan(materialId: string) {
   await wajibSesi();
-  const outlet = await getOutletAktif();
+  const outlet = await getOutletMenulis();
   const milik = db
     .select({ id: materials.id })
     .from(materials)
