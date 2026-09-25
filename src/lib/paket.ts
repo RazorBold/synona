@@ -45,20 +45,58 @@ export function hargaPaket(paket: Paket, periode: Periode): number {
   return PAKET[paket].harga * (periode === "tahun" ? 10 : 1);
 }
 
+/** Panjang masa coba gratis untuk setiap pendaftar baru. */
+export const HARI_MASA_COBA = 14;
+
 export type StatusLangganan =
   /** Akun lama / pengelola platform — tidak pernah dikunci. */
   | "bebas"
-  /** Baru mendaftar, pembayaran pertama belum disetujui. */
-  | "belum-aktif"
+  /** Masa coba gratis sedang berjalan. */
+  | "coba"
+  /** Sudah membayar dan masih berlaku. */
   | "aktif"
-  /** Pernah aktif, masa berlakunya sudah lewat: hanya-baca. */
-  | "habis";
+  /** Masa coba atau langganannya sudah lewat: hanya-baca. */
+  | "habis"
+  /**
+   * Tidak punya tanggal berakhir sama sekali padahal wajib bayar. Sejak
+   * pendaftaran memberi masa coba otomatis, ini hanya terjadi pada akun
+   * yang sempat dibuat di versi lama — diperlakukan sama seperti habis,
+   * dan pemiliknya diarahkan ke halaman langganan.
+   */
+  | "belum-aktif";
+
+type BarisLangganan = {
+  wajibBayar: number;
+  planEndsAt: number | null;
+  trialEndsAt?: number | null;
+};
 
 export function statusLangganan(
-  u: { wajibBayar: number; planEndsAt: number | null },
+  u: BarisLangganan,
   sekarang = Date.now(),
 ): StatusLangganan {
   if (u.wajibBayar !== 1) return "bebas";
   if (u.planEndsAt === null) return "belum-aktif";
-  return u.planEndsAt > sekarang ? "aktif" : "habis";
+  if (u.planEndsAt <= sekarang) return "habis";
+  /*
+   * Masih masa coba selama belum ada pembayaran yang memperpanjangnya.
+   * Pembayaran menambah masa dari tanggal berakhir yang berjalan, jadi
+   * begitu disetujui `planEndsAt` pasti melewati `trialEndsAt`.
+   */
+  const masihCoba =
+    u.trialEndsAt !== null &&
+    u.trialEndsAt !== undefined &&
+    u.planEndsAt <= u.trialEndsAt;
+  return masihCoba ? "coba" : "aktif";
+}
+
+/** Sisa hari sampai berakhir; negatif berarti sudah lewat. */
+export function sisaHariLangganan(planEndsAt: number | null, sekarang = Date.now()): number | null {
+  if (planEndsAt === null) return null;
+  return Math.ceil((planEndsAt - sekarang) / 86_400_000);
+}
+
+/** Boleh mencatat data baru? "habis" dan "belum-aktif" hanya-baca. */
+export function bolehMenulis(status: StatusLangganan): boolean {
+  return status === "bebas" || status === "coba" || status === "aktif";
 }

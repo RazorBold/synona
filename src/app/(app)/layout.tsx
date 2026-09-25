@@ -40,7 +40,12 @@ export default async function AppLayout({
 
   const outlet = await getOutletAktif();
 
-  // Pendaftar yang belum membayar hanya boleh sampai halaman checkout.
+  /**
+   * Pendaftar baru langsung mendapat masa coba, jadi hampir tidak ada yang
+   * mendarat di sini tanpa tanggal berakhir. Yang tersisa hanya akun dari
+   * versi lama yang dibuat sebelum masa coba otomatis ada — ia diarahkan ke
+   * halaman langganan untuk mengaktifkan akunnya.
+   */
   const langganan = statusLangganan(outlet);
   if (langganan === "belum-aktif") redirect("/langganan");
 
@@ -99,13 +104,13 @@ export default async function AppLayout({
       />
 
       {akun.sandiMasihDefault && <BannerSandiDefault />}
-      {sisaHariPaket !== null && sisaHariPaket <= 7 && (
-        <BannerMasaPaket
-          sisaHari={sisaHariPaket}
-          hanyaBaca={langganan === "habis"}
-          wajibBayar={langganan !== "bebas"}
-        />
-      )}
+      {sisaHariPaket !== null &&
+        (langganan === "coba" || langganan === "habis" || sisaHariPaket <= 7) && (
+          <BannerMasaPaket
+            sisaHari={sisaHariPaket}
+            status={langganan}
+          />
+        )}
       {children}
     </AppShell>
   );

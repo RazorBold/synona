@@ -8,7 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { RUTE_MASUK } from "@/lib/auth-const";
+import { RUTE_DAFTAR } from "@/lib/auth-const";
 
 const JANJI: { ikon: LucideIcon; baris: [string, string] }[] = [
   { ikon: MonitorSmartphone, baris: ["Jalan di HP, tablet,", "dan komputer"] },
@@ -77,16 +77,16 @@ export function AjakanSection() {
           </ul>
 
           <Link
-            href={RUTE_MASUK}
-            data-jejak="ajakan:masuk"
+            href={RUTE_DAFTAR}
+            data-jejak="ajakan:daftar"
             className="group mt-9 inline-flex h-14 items-center gap-2.5 rounded-full bg-blue-600 px-12 text-[16px] font-bold text-white shadow-[0_16px_32px_-14px_rgba(37,99,235,0.75)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-blue-700"
           >
-            Masuk ke Synona
+            Coba Gratis 14 Hari
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
 
           <p className="mt-4 text-sm text-ink-soft">
-            Mulai lebih rapi, lebih tenang, setiap hari.
+            Tanpa kartu kredit. Semua fitur terbuka sejak hari pertama.
           </p>
         </div>
       </div>

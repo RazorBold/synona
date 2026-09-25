@@ -20,6 +20,7 @@ export type BarisUsaha = {
   transaksiTerakhir: number | null;
   paket: Paket;
   berakhir: number | null;
+  masaCobaSampai: number | null;
   status: StatusLangganan;
 };
 
@@ -37,6 +38,7 @@ export function daftarUsaha(): BarisUsaha[] {
     wajibBayar: number;
     paket: Paket;
     berakhir: number | null;
+    masaCobaSampai: number | null;
     usaha: string | null;
     jenis: BarisUsaha["jenis"];
     namaPengguna: string | null;
@@ -48,6 +50,7 @@ export function daftarUsaha(): BarisUsaha[] {
     SELECT u.id AS userId, u.name AS pemilik, u.phone AS telepon,
            u.created_at AS terdaftar, u.wajib_bayar AS wajibBayar,
            u.plan AS paket, u.plan_ends_at AS berakhir,
+           u.trial_ends_at AS masaCobaSampai,
            o.name AS usaha, o.jenis_usaha AS jenis,
            p.nama_pengguna AS namaPengguna, p.aktif AS loginAktif,
            (SELECT COUNT(*) FROM staff s WHERE s.outlet_id = o.id AND s.role = 'kasir'
@@ -79,7 +82,12 @@ export function daftarUsaha(): BarisUsaha[] {
       transaksiTerakhir: r.transaksiTerakhir,
       paket: r.paket,
       berakhir: r.berakhir,
-      status: statusLangganan({ wajibBayar: r.wajibBayar, planEndsAt: r.berakhir }),
+      masaCobaSampai: r.masaCobaSampai,
+      status: statusLangganan({
+        wajibBayar: r.wajibBayar,
+        planEndsAt: r.berakhir,
+        trialEndsAt: r.masaCobaSampai,
+      }),
     }));
 }
 

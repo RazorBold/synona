@@ -24,6 +24,7 @@ export default function RingkasanAdmin() {
 
   const tahap = [
     { label: "Mendaftar", nilai: corong.daftar },
+    { label: "Masa coba", nilai: corong.coba },
     { label: "Checkout", nilai: corong.checkout },
     { label: "Membayar", nilai: corong.bayar },
     { label: "Aktif", nilai: corong.aktif },
@@ -54,7 +55,7 @@ export default function RingkasanAdmin() {
 
       <section className="card p-5">
         <h2 className="card-title text-[17px]">Corong pelanggan berbayar</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {tahap.map((t, i) => (
             <div key={t.label} className="rounded-2xl bg-canvas px-4 py-3">
               <p className="text-xs font-semibold text-muted">

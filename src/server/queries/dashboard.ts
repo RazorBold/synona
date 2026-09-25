@@ -30,6 +30,7 @@ const KOLOM_OUTLET = {
   ownerPhone: users.phone,
   plan: users.plan,
   planEndsAt: users.planEndsAt,
+  trialEndsAt: users.trialEndsAt,
   wajibBayar: users.wajibBayar,
   qrisGambar: outlets.qrisGambar,
   pajakNama: outlets.pajakNama,
@@ -142,11 +143,11 @@ export async function getOutletMenulis() {
   const outlet = await getOutletAktif();
   const status = statusLangganan(outlet);
   if (status === "belum-aktif") {
-    throw new Error("Langganan belum aktif. Selesaikan pembayaran di halaman Langganan.");
+    throw new Error("Langganan belum aktif. Buka halaman Langganan untuk mengaktifkannya.");
   }
   if (status === "habis") {
     throw new Error(
-      "Masa langganan sudah berakhir — data hanya bisa dilihat. Perpanjang di halaman Langganan untuk mencatat lagi.",
+      "Masa coba/langganan sudah berakhir — data hanya bisa dilihat. Perpanjang di halaman Langganan untuk mencatat lagi.",
     );
   }
   return outlet;

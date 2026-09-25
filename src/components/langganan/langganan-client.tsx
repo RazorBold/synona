@@ -9,6 +9,7 @@ import {
   Clock,
   Copy,
   Crown,
+  Gift,
   ImagePlus,
   Loader2,
   LogOut,
@@ -62,6 +63,10 @@ export function LanggananClient(p: Props) {
   // selesai — orang yang sampai di halaman ini sudah punya akun.
   const langkah =
     p.status === "aktif" || p.status === "bebas" ? 5 : p.terbuka ? 3 : 2;
+  const sisaCoba =
+    p.status === "coba" && p.berakhir
+      ? Math.max(0, Math.ceil((p.berakhir - Date.now()) / 86_400_000))
+      : null;
 
   return (
     <div className="min-h-dvh bg-[linear-gradient(135deg,#f2f2fd_0%,#f7f7ff_45%,#eeeefc_100%)]">
@@ -72,7 +77,7 @@ export function LanggananClient(p: Props) {
             <span className="text-lg font-extrabold tracking-tight text-ink">Synona</span>
           </div>
           <div className="flex items-center gap-2">
-            {(p.status === "aktif" || p.status === "bebas" || p.status === "habis") && (
+            {p.status !== "belum-aktif" && (
               <Link
                 href="/"
                 className="hidden h-10 items-center rounded-xl px-3 text-sm font-semibold text-ink-soft hover:bg-canvas sm:flex"
@@ -93,11 +98,13 @@ export function LanggananClient(p: Props) {
         <div className="text-center">
           <p className="text-sm font-semibold text-brand-600">{p.namaUsaha}</p>
           <h1 className="mt-1 text-[clamp(1.6rem,3vw,2.2rem)] font-extrabold tracking-tight text-ink">
-            {p.status === "belum-aktif"
-              ? "Satu langkah lagi — aktifkan langganan"
+            {p.status === "coba"
+              ? "Lanjutkan setelah masa coba"
               : p.status === "habis"
-                ? "Perpanjang langganan Synona"
-                : "Langganan Synona"}
+                ? "Aktifkan kembali Synona"
+                : p.status === "belum-aktif"
+                  ? "Aktifkan akun Anda"
+                  : "Langganan Synona"}
           </h1>
           <StatusSingkat {...p} />
         </div>
@@ -133,7 +140,10 @@ export function LanggananClient(p: Props) {
                 </span>
               </p>
             )}
-            <PilihPaket paketSekarang={p.status === "aktif" ? p.paketSekarang : null} />
+            <PilihPaket
+              paketSekarang={p.status === "aktif" ? p.paketSekarang : null}
+              masaCoba={sisaCoba}
+            />
           </>
         )}
 
@@ -172,19 +182,34 @@ function StatusSingkat(p: Props) {
       </p>
     );
   }
+  if (p.status === "coba" && p.berakhir) {
+    const sisa = Math.max(0, Math.ceil((p.berakhir - Date.now()) / 86_400_000));
+    return (
+      <>
+        <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand-600">
+          <Gift className="size-4" />
+          Masa coba gratis {sisa === 0 ? "berakhir hari ini" : `tinggal ${sisa} hari`} — sampai {tgl(p.berakhir)}
+        </p>
+        <p className="mx-auto mt-2 max-w-xl text-[15px] text-ink-soft">
+          Semua fitur terbuka selama masa coba. Pilih paket kapan saja; sisa
+          hari masa coba tidak hangus — masa bayarnya ditambahkan setelahnya.
+        </p>
+      </>
+    );
+  }
   if (p.status === "habis" && p.berakhir) {
     return (
       <p className="mt-2 text-sm text-danger">
         Berakhir {tgl(p.berakhir)}. Data Anda aman dan tetap bisa dilihat, tapi
-        belum bisa mencatat transaksi baru sampai diperpanjang.
+        belum bisa mencatat transaksi baru sampai langganan diaktifkan.
       </p>
     );
   }
   if (p.status === "belum-aktif") {
     return (
       <p className="mx-auto mt-2 max-w-xl text-[15px] text-ink-soft">
-        Akun <b>{p.namaAkun}</b> sudah dibuat. Pilih paket, bayar lewat QRIS,
-        dan Synona siap dipakai begitu pembayaran diverifikasi.
+        Akun <b>{p.namaAkun}</b> belum punya masa aktif. Pilih paket, bayar
+        lewat QRIS, dan Synona siap dipakai begitu pembayaran diverifikasi.
       </p>
     );
   }
@@ -230,7 +255,14 @@ function Langkah({ aktif }: { aktif: number }) {
   );
 }
 
-function PilihPaket({ paketSekarang }: { paketSekarang: Paket | null }) {
+function PilihPaket({
+  paketSekarang,
+  masaCoba,
+}: {
+  paketSekarang: Paket | null;
+  /** Sisa hari masa coba; null kalau tidak sedang mencoba. */
+  masaCoba: number | null;
+}) {
   const router = useRouter();
   const [periode, setPeriode] = useState<Periode>("bulan");
   const [dipilih, setDipilih] = useState<Paket | null>(null);
@@ -249,6 +281,12 @@ function PilihPaket({ paketSekarang }: { paketSekarang: Paket | null }) {
 
   return (
     <section className="mt-8">
+      {masaCoba !== null && (
+        <p className="mx-auto mb-5 max-w-xl rounded-2xl bg-white px-5 py-3 text-center text-sm text-ink-soft shadow-card">
+          Tidak perlu buru-buru — Synona tetap bisa dipakai penuh selama{" "}
+          <b className="text-ink">{masaCoba} hari</b> ke depan.
+        </p>
+      )}
       <div className="flex justify-center">
         <div className="inline-flex rounded-2xl border border-line bg-white p-1 shadow-card">
           {(["bulan", "tahun"] as Periode[]).map((pr) => (

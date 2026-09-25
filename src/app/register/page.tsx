@@ -27,8 +27,8 @@ const NILAI_JUAL = [
   },
   {
     ikon: TrendingUp,
-    judul: "Siap mendukung pertumbuhan",
-    isi: "Dari satu warung sampai beberapa cabang.",
+    judul: "Gratis 14 hari penuh",
+    isi: "Semua fitur terbuka. Pilih paket kalau sudah cocok.",
   },
 ];
 
@@ -47,15 +47,19 @@ export default async function HalamanDaftar() {
 
   return (
     <BingkaiAuth
-      lencana="Kelola usaha, lebih mudah"
+      lencana="Gratis 14 hari, tanpa kartu kredit"
       judulPanel="Mulai perjalanan bisnismu"
       judulPanelAksen="bersama Synona"
       isiPanel="Satu akun untuk mengelola seluruh data usaha, transaksi, dan laporan — lebih efisien, lebih aman, lebih berkembang."
       nilaiJual={NILAI_JUAL}
       tulisanTangan={["Langkah kecil hari ini", "untuk masa depan yang lebih besar"]}
       gambar={gambar}
-      judul="Daftarkan akun Anda"
-      keterangan="Isi data berikut untuk mulai menggunakan Synona dan kelola usaha Anda dengan lebih mudah."
+      judul={
+        <>
+          Coba <span className="text-brand-500">gratis 14 hari</span>
+        </>
+      }
+      keterangan="Isi data berikut dan Synona langsung bisa dipakai penuh selama 14 hari. Tanpa pembayaran di awal, tanpa menunggu persetujuan."
       tautanAtas={{
         tanya: "Sudah punya akun?",
         label: "Masuk",

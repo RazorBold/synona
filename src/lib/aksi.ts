@@ -17,7 +17,7 @@ export const PESAN_GAGAL_UMUM =
   "Gagal menghubungi server. Periksa koneksi, lalu coba lagi.";
 
 const PESAN_LANGGANAN_HABIS =
-  "Masa langganan sudah berakhir — data hanya bisa dilihat. Perpanjang di halaman Langganan untuk mencatat lagi.";
+  "Masa coba/langganan sudah berakhir — data hanya bisa dilihat. Aktifkan di halaman Langganan untuk mencatat lagi.";
 
 const PESAN_SESI_HABIS =
   "Sesi Anda sudah berakhir. Muat ulang halaman ini, lalu masuk kembali.";

@@ -163,6 +163,7 @@ export function corongLangganan() {
   const sekarang = Date.now();
   const r = db.get<{
     daftar: number;
+    coba: number;
     checkout: number;
     bayar: number;
     aktif: number;
@@ -177,13 +178,25 @@ export function corongLangganan() {
       (SELECT COUNT(DISTINCT p.user_id) FROM pembayaran_langganan p
          JOIN users u ON u.id = p.user_id
         WHERE u.wajib_bayar = 1 AND p.status IN ('diperiksa','disetujui')) AS bayar,
-      (SELECT COUNT(*) FROM users WHERE wajib_bayar = 1 AND plan_ends_at > ${sekarang}) AS aktif,
+      (SELECT COUNT(*) FROM users WHERE wajib_bayar = 1 AND plan_ends_at > ${sekarang}
+         AND trial_ends_at IS NOT NULL AND plan_ends_at <= trial_ends_at) AS coba,
+      (SELECT COUNT(*) FROM users WHERE wajib_bayar = 1 AND plan_ends_at > ${sekarang}
+         AND (trial_ends_at IS NULL OR plan_ends_at > trial_ends_at)) AS aktif,
       (SELECT COUNT(*) FROM users WHERE wajib_bayar = 1 AND plan_ends_at <= ${sekarang}) AS habis,
       (SELECT COUNT(*) FROM (SELECT user_id FROM pembayaran_langganan
         WHERE status = 'disetujui' GROUP BY user_id HAVING COUNT(*) >= 2)) AS perpanjang,
       (SELECT COALESCE(SUM(nominal), 0) FROM pembayaran_langganan WHERE status = 'disetujui') AS pendapatan
   `);
   return (
-    r ?? { daftar: 0, checkout: 0, bayar: 0, aktif: 0, habis: 0, perpanjang: 0, pendapatan: 0 }
+    r ?? {
+      daftar: 0,
+      coba: 0,
+      checkout: 0,
+      bayar: 0,
+      aktif: 0,
+      habis: 0,
+      perpanjang: 0,
+      pendapatan: 0,
+    }
   );
 }

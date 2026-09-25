@@ -2,14 +2,16 @@ import type { StatusLangganan } from "@/lib/paket";
 
 const LABEL: Record<StatusLangganan, string> = {
   bebas: "Akun lama",
-  "belum-aktif": "Belum bayar",
-  aktif: "Aktif",
+  "belum-aktif": "Belum aktif",
+  coba: "Masa coba",
+  aktif: "Berbayar",
   habis: "Habis",
 };
 
 const WARNA: Record<StatusLangganan, string> = {
   bebas: "bg-canvas text-ink-soft",
   "belum-aktif": "bg-amber-50 text-amber-700",
+  coba: "bg-brand-50 text-brand-600",
   aktif: "bg-emerald-50 text-emerald-700",
   habis: "bg-red-50 text-danger",
 };
