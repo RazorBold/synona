@@ -1,0 +1,9 @@
+# Berkas yang tidak perlu diunggah ke build Vercel. Jangan pakai pola global
+# seperti *.png di sini: ikon PWA di public/ dan ilustrasi di src/images/ ikut
+# terbuang dan halaman depannya kehilangan seluruh gambarnya.
+node_modules
+.next
+/ChatGPT Image 20 Agu 2026, 12.57.07.png
+/synona-alur-flowchart.pdf
+/PRD.md
+/PRD-TEKNIS.md
