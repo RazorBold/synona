@@ -8,7 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { RUTE_DAFTAR } from "@/lib/auth-const";
+import { URL_DAFTAR } from "@/lib/tautan-aplikasi";
 
 const JANJI: { ikon: LucideIcon; baris: [string, string] }[] = [
   { ikon: MonitorSmartphone, baris: ["Jalan di HP, tablet,", "dan komputer"] },
@@ -20,6 +20,7 @@ const JANJI: { ikon: LucideIcon; baris: [string, string] }[] = [
 export function AjakanSection() {
   return (
     <section
+      id="ajakan"
       data-jejak-bagian="ajakan"
       className="bg-[linear-gradient(180deg,#ffffff_0%,#f8faff_100%)] px-5 py-16 sm:px-8 lg:py-20"
     >
@@ -77,7 +78,7 @@ export function AjakanSection() {
           </ul>
 
           <Link
-            href={RUTE_DAFTAR}
+            href={URL_DAFTAR}
             data-jejak="ajakan:daftar"
             className="group mt-9 inline-flex h-14 items-center gap-2.5 rounded-full bg-blue-600 px-12 text-[16px] font-bold text-white shadow-[0_16px_32px_-14px_rgba(37,99,235,0.75)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-blue-700"
           >

@@ -24,10 +24,5 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "maskable",
       },
     ],
-    shortcuts: [
-      { name: "Kasir", short_name: "Kasir", url: "/kasir" },
-      { name: "Kasbon", short_name: "Kasbon", url: "/kasbon" },
-      { name: "Laporan", short_name: "Laporan", url: "/laporan" },
-    ],
   };
 }

@@ -1,1 +1,0 @@
-ALTER TABLE `products` ADD `lacak_stok` integer DEFAULT 1 NOT NULL;

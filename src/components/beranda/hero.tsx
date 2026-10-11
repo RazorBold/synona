@@ -16,7 +16,7 @@ import gambarLaporan from "@/images/fitur-laporan.webp";
 import gambarPenjualan from "@/images/fitur-penjualan.webp";
 import gambarStok from "@/images/fitur-stok.webp";
 import { KARTU } from "@/components/beranda/isi";
-import { RUTE_MASUK } from "@/lib/auth-const";
+import { URL_MASUK } from "@/lib/tautan-aplikasi";
 import { cn } from "@/lib/utils";
 
 /** Tulisan tangan di papan: hanya dipakai di sini, jadi dimuat di sini. */
@@ -127,7 +127,7 @@ function Ajakan() {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
       <Link
-        href={RUTE_MASUK}
+        href={URL_MASUK}
         data-jejak="hero:mulai"
         className="group inline-flex h-14 items-center gap-2 rounded-full bg-blue-600 px-8 text-[15px] font-bold text-white shadow-[0_14px_30px_-12px_rgba(37,99,235,0.7)] transition-[transform,background-color] hover:-translate-y-0.5 hover:bg-blue-700"
       >
@@ -178,7 +178,7 @@ function KartuFitur({ k }: { k: (typeof KARTU)[number] }) {
         </h2>
         <p className="mt-2.5 text-sm leading-relaxed text-ink-soft">{k.isi}</p>
         <Link
-          href={`${RUTE_MASUK}?lanjut=${encodeURIComponent(k.tujuan)}`}
+          href={URL_MASUK}
           data-jejak={`kartu:${k.tema}`}
           className={cn(
             "mt-5 inline-flex w-fit items-center gap-2 whitespace-nowrap rounded-full border bg-white/70 px-5 py-2.5 text-sm font-bold backdrop-blur transition-colors",

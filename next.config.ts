@@ -1,22 +1,16 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
+/**
+ * Konfigurasi branch `vercel-landing` — halaman depan saja, di-host Vercel.
+ *
+ * Sengaja TIDAK memakai `output: "standalone"`, `serverExternalPackages`, atau
+ * `outputFileTracingRoot` seperti di `main`: ketiganya ada di sana untuk
+ * pemasangan sendiri lewat nginx + pm2 dengan better-sqlite3, dan tidak ada
+ * yang relevan di platform serverless. Branch ini juga tidak punya server
+ * action, jadi batas bodySizeLimit pun tak diperlukan.
+ */
 const nextConfig: NextConfig = {
-  output: "standalone",
-  // Ada package-lock.json nyasar di /home/ipul yang bikin Next menyimpulkan
-  // root monorepo terlalu tinggi dan menaruh output standalone di path
-  // bersarang (.next/standalone/synona/synona). Kunci ke folder proyek.
-  outputFileTracingRoot: path.join(__dirname),
-  // better-sqlite3 adalah modul native: biarkan Next me-require-nya apa adanya
-  // alih-alih membundelnya ke dalam output server.
-  serverExternalPackages: ["better-sqlite3"],
-  // Badge dev Next.js default di kiri-bawah menutupi profil di sidebar.
   devIndicators: { position: "bottom-right" },
-  experimental: {
-    // Foto produk dikirim lewat Server Action; batas bawaan 1 MB terlalu kecil
-    // untuk foto kamera meski sudah dikompres di sisi klien.
-    serverActions: { bodySizeLimit: "4mb" },
-  },
 };
 
 export default nextConfig;

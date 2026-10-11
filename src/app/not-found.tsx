@@ -7,10 +7,10 @@ export default function TidakDitemukan() {
     <LayarPesan
       kode="404"
       judul="Halaman tidak ditemukan"
-      keterangan="Alamat yang Anda buka tidak ada, atau menunya sudah dipindahkan. Data usaha Anda aman."
+      keterangan="Alamat yang Anda buka tidak ada di situs ini."
       aksi={
         <Link href="/" className={tombolUtama}>
-          Kembali ke Dashboard
+          Kembali ke halaman depan
         </Link>
       }
     />
